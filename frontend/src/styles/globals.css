@@ -1,0 +1,202 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ElevateCRM — Global Design System
+   Using TailwindCSS v4 CSS-first configuration
+   Design inspiration: Linear + Vercel + Stripe
+   ───────────────────────────────────────────────────────────────────────────── */
+
+
+
+/* ── Theme Tokens (Light Mode) ─────────────────────────────────────────────── */
+:root {
+  /* Colors — Semantic Tokens */
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(224 71.4% 4.1%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(224 71.4% 4.1%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(224 71.4% 4.1%);
+  --color-primary: hsl(262.1 83.3% 57.8%);
+  --color-primary-foreground: hsl(210 20% 98%);
+  --color-secondary: hsl(220 14.3% 95.9%);
+  --color-secondary-foreground: hsl(220.9 39.3% 11%);
+  --color-muted: hsl(220 14.3% 95.9%);
+  --color-muted-foreground: hsl(220 8.9% 46.1%);
+  --color-accent: hsl(220 14.3% 95.9%);
+  --color-accent-foreground: hsl(220.9 39.3% 11%);
+  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-destructive-foreground: hsl(210 20% 98%);
+  --color-border: hsl(220 13% 91%);
+  --color-input: hsl(220 13% 91%);
+  --color-ring: hsl(262.1 83.3% 57.8%);
+  --color-success: hsl(142.1 76.2% 36.3%);
+  --color-success-foreground: hsl(355.7 100% 97.3%);
+  --color-warning: hsl(32.1 94.6% 43.7%);
+  --color-warning-foreground: hsl(210 20% 98%);
+  --color-info: hsl(221.2 83.2% 53.3%);
+  --color-info-foreground: hsl(210 20% 98%);
+
+  /* Sidebar */
+  --color-sidebar: hsl(224 71.4% 4.1%);
+  --color-sidebar-foreground: hsl(210 20% 98%);
+  --color-sidebar-muted: hsl(215 20.2% 65.1%);
+  --color-sidebar-border: hsl(217.2 32.6% 17.5%);
+  --color-sidebar-accent: hsl(217.2 32.6% 17.5%);
+  --color-sidebar-accent-foreground: hsl(210 20% 98%);
+  --color-sidebar-primary: hsl(262.1 83.3% 57.8%);
+  --color-sidebar-primary-foreground: hsl(210 20% 98%);
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Border Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-card: 0 0 0 1px rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.08);
+
+  /* Animations */
+  --animate-duration-fast: 150ms;
+  --animate-duration-normal: 250ms;
+  --animate-duration-slow: 400ms;
+  --animate-easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-easing-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Dark Mode ─────────────────────────────────────────────────────────────── */
+.dark {
+  --color-background: hsl(224 71.4% 4.1%);
+  --color-foreground: hsl(210 20% 98%);
+  --color-card: hsl(224 71.4% 6%);
+  --color-card-foreground: hsl(210 20% 98%);
+  --color-popover: hsl(224 71.4% 4.1%);
+  --color-popover-foreground: hsl(210 20% 98%);
+  --color-primary: hsl(263.4 70% 50.4%);
+  --color-primary-foreground: hsl(210 20% 98%);
+  --color-secondary: hsl(215 27.9% 16.9%);
+  --color-secondary-foreground: hsl(210 20% 98%);
+  --color-muted: hsl(215 27.9% 16.9%);
+  --color-muted-foreground: hsl(217.9 10.6% 64.9%);
+  --color-accent: hsl(215 27.9% 16.9%);
+  --color-accent-foreground: hsl(210 20% 98%);
+  --color-destructive: hsl(0 62.8% 30.6%);
+  --color-destructive-foreground: hsl(210 20% 98%);
+  --color-border: hsl(215 27.9% 16.9%);
+  --color-input: hsl(215 27.9% 16.9%);
+  --color-ring: hsl(263.4 70% 50.4%);
+  --color-success: hsl(142.1 70.6% 45.3%);
+  --color-warning: hsl(32.1 94.6% 53.7%);
+  --color-info: hsl(221.2 83.2% 63.3%);
+}
+
+/* ── Base Styles ───────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-color: var(--color-border);
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ── Focus Ring ────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* ── Selection ─────────────────────────────────────────────────────────────── */
+::selection {
+  background-color: hsl(from var(--color-primary) h s l / 0.2);
+  color: var(--color-foreground);
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-muted-foreground);
+}
+
+/* ── Utility Classes ───────────────────────────────────────────────────────── */
+.auth-bg {
+  background: radial-gradient(
+      ellipse 80% 80% at 50% -20%,
+      hsl(from var(--color-primary) h s l / 0.15),
+      transparent
+    ),
+    var(--color-background);
+}
+
+.card-glass {
+  background: hsl(from var(--color-card) h s l / 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.input-base {
+  height: 2.75rem;
+  width: 100%;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--color-foreground);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  outline: none;
+}
+
+.input-base::placeholder {
+  color: var(--color-muted-foreground);
+}
+
+.input-base:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px hsl(from var(--color-primary) h s l / 0.15);
+}
+
+.input-base.error {
+  border-color: var(--color-destructive);
+  box-shadow: 0 0 0 3px hsl(from var(--color-destructive) h s l / 0.1);
+}
