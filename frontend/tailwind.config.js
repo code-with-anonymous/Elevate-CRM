@@ -1,68 +1,88 @@
 /** @type {import('tailwindcss').Config} */
+
+// Colors resolve to bare HSL channels declared in src/styles/globals.css, so
+// every token composes with Tailwind's alpha syntax — `border-border/60`,
+// `bg-primary/10`, `text-status-positive/70`.
+const hsl = (name) => `hsl(var(--${name}) / <alpha-value>)`;
+
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        background: 'var(--color-background)',
-        foreground: 'var(--color-foreground)',
+        background: hsl('background'),
+        foreground: hsl('foreground'),
         card: {
-          DEFAULT: 'var(--color-card)',
-          foreground: 'var(--color-card-foreground)',
+          DEFAULT: hsl('card'),
+          foreground: hsl('card-foreground'),
         },
         popover: {
-          DEFAULT: 'var(--color-popover)',
-          foreground: 'var(--color-popover-foreground)',
+          DEFAULT: hsl('popover'),
+          foreground: hsl('popover-foreground'),
+        },
+        surface: {
+          DEFAULT: hsl('surface'),
+          foreground: hsl('surface-foreground'),
         },
         primary: {
-          DEFAULT: 'var(--color-primary)',
-          foreground: 'var(--color-primary-foreground)',
+          DEFAULT: hsl('primary'),
+          foreground: hsl('primary-foreground'),
+          subtle: hsl('primary-subtle'),
         },
         secondary: {
-          DEFAULT: 'var(--color-secondary)',
-          foreground: 'var(--color-secondary-foreground)',
+          DEFAULT: hsl('secondary'),
+          foreground: hsl('secondary-foreground'),
         },
         muted: {
-          DEFAULT: 'var(--color-muted)',
-          foreground: 'var(--color-muted-foreground)',
+          DEFAULT: hsl('muted'),
+          foreground: hsl('muted-foreground'),
         },
         accent: {
-          DEFAULT: 'var(--color-accent)',
-          foreground: 'var(--color-accent-foreground)',
+          DEFAULT: hsl('accent'),
+          foreground: hsl('accent-foreground'),
         },
         destructive: {
-          DEFAULT: 'var(--color-destructive)',
-          foreground: 'var(--color-destructive-foreground)',
+          DEFAULT: hsl('destructive'),
+          foreground: hsl('destructive-foreground'),
         },
-        border: 'var(--color-border)',
-        input: 'var(--color-input)',
-        ring: 'var(--color-ring)',
+        border: hsl('border'),
+        input: hsl('input'),
+        ring: hsl('ring'),
+        overlay: hsl('overlay'),
         success: {
-          DEFAULT: 'var(--color-success)',
-          foreground: 'var(--color-success-foreground)',
+          DEFAULT: hsl('success'),
+          foreground: hsl('success-foreground'),
         },
         warning: {
-          DEFAULT: 'var(--color-warning)',
-          foreground: 'var(--color-warning-foreground)',
+          DEFAULT: hsl('warning'),
+          foreground: hsl('warning-foreground'),
         },
         info: {
-          DEFAULT: 'var(--color-info)',
-          foreground: 'var(--color-info-foreground)',
+          DEFAULT: hsl('info'),
+          foreground: hsl('info-foreground'),
+        },
+        // Desaturated status ramp — dots, pills, chart series
+        status: {
+          neutral: hsl('status-neutral'),
+          info: hsl('status-info'),
+          warn: hsl('status-warn'),
+          progress: hsl('status-progress'),
+          positive: hsl('status-positive'),
+          negative: hsl('status-negative'),
+          accent: hsl('status-accent'),
         },
         sidebar: {
-          DEFAULT: 'var(--color-sidebar)',
-          foreground: 'var(--color-sidebar-foreground)',
-          muted: 'var(--color-sidebar-muted)',
-          border: 'var(--color-sidebar-border)',
-          accent: 'var(--color-sidebar-accent)',
-          "accent-foreground": 'var(--color-sidebar-accent-foreground)',
-          primary: 'var(--color-sidebar-primary)',
-          "primary-foreground": 'var(--color-sidebar-primary-foreground)',
-        }
+          DEFAULT: hsl('sidebar'),
+          foreground: hsl('sidebar-foreground'),
+          muted: hsl('sidebar-muted'),
+          border: hsl('sidebar-border'),
+          accent: hsl('sidebar-accent'),
+          'accent-foreground': hsl('sidebar-accent-foreground'),
+          primary: hsl('sidebar-primary'),
+          'primary-foreground': hsl('sidebar-primary-foreground'),
+          popover: hsl('sidebar-popover'),
+        },
       },
       borderRadius: {
         sm: 'var(--radius-sm)',
@@ -78,11 +98,39 @@ export default {
         md: 'var(--shadow-md)',
         lg: 'var(--shadow-lg)',
         card: 'var(--shadow-card)',
+        pop: 'var(--shadow-pop)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-      }
+        sans: ['Inter', 'Inter Variable', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['ui-monospace', 'SF Mono', 'Cascadia Mono', 'Consolas', 'monospace'],
+      },
+      letterSpacing: {
+        tighter: '-0.03em',
+        tight: '-0.02em',
+      },
+      transitionTimingFunction: {
+        out: 'var(--ease-out)',
+        default: 'var(--ease-default)',
+      },
+      transitionDuration: {
+        fast: '150ms',
+        normal: '200ms',
+      },
+      keyframes: {
+        'fade-up': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+      },
+      animation: {
+        'fade-up': 'fade-up 200ms var(--ease-out) both',
+        'fade-in': 'fade-in 150ms var(--ease-out) both',
+      },
     },
   },
   plugins: [],
-}
+};

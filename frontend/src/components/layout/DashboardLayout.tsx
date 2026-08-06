@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // src/components/layout/DashboardLayout.tsx
-// Full dashboard shell — Sidebar + TopNavbar + main content area
+// App shell — icon rail + chrome bar + content well.
+// The rail collapses away below `md`; the navbar tabs carry navigation there.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { ReactNode } from 'react';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
@@ -17,32 +18,31 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Fixed sidebar */}
       <Sidebar />
 
-      {/* Main area — offset by sidebar width */}
-      <div className="flex flex-1 flex-col pl-[68px]">
-        {/* Sticky top navbar */}
+      {/* Offset by the rail only once the rail exists */}
+      <div className="flex min-w-0 flex-1 flex-col md:pl-[68px]">
         <TopNavbar />
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto px-6 py-6">
-          {children}
-        </main>
+        {/* The single page gutter — pages should not add their own outer padding */}
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
 
-      {/* Session timeout warning modal */}
       {showWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg">
-            <h3 className="mb-2 text-lg font-semibold text-foreground">
-              Session Expiring Soon
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl border border-border/60 bg-card p-6 shadow-pop">
+            <h3 className="mb-1.5 text-base font-semibold tracking-tight text-foreground">
+              Session expiring soon
             </h3>
-            <p className="mb-6 text-sm text-muted-foreground">
-              Your session will expire in {timeRemaining} seconds due to inactivity.
+            <p className="mb-6 text-[13px] leading-relaxed text-muted-foreground">
+              You'll be signed out in{' '}
+              <span className="font-medium tabular-nums text-foreground">
+                {timeRemaining}
+              </span>{' '}
+              seconds due to inactivity.
             </p>
             <Button className="w-full" onClick={extendSession}>
-              Stay Logged In
+              Stay signed in
             </Button>
           </div>
         </div>

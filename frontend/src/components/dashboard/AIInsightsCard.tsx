@@ -1,114 +1,164 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// src/components/dashboard/AIInsightsCard.tsx
+// The one card that's allowed to look alive. A slow conic gradient traces the
+// border (`.aurora-border`, 8s) to mark it as the generative surface — and it
+// only spins while there's something to say, so idle state stays quiet.
+// ─────────────────────────────────────────────────────────────────────────────
+import { AnimatePresence, motion } from 'framer-motion';
+import { AlertTriangle, CheckCircle2, Info, Loader2, Sparkles } from 'lucide-react';
 import { useAIInsights } from '@/hooks/useDashboard';
-import { Sparkles, CheckCircle2, AlertTriangle, Info, Loader2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { formatCurrency } from '@/lib/format';
+import { cn } from '@/lib/cn';
+import { DURATION, EASE_OUT } from '@/lib/motion';
+
+const INSIGHT_STYLES = {
+  positive: { Icon: CheckCircle2, className: 'text-status-positive' },
+  warning: { Icon: AlertTriangle, className: 'text-status-warn' },
+  default: { Icon: Info, className: 'text-status-info' },
+} as const;
 
 export default function AIInsightsCard() {
   const { data, isFetching, isError, refetch } = useAIInsights();
 
+  const live = Boolean(data) || isFetching;
+
   return (
-    <div className="flex min-h-[192px] h-auto flex-col rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md relative overflow-hidden">
+    <div
+      className={cn(
+        'relative flex h-auto min-h-[192px] flex-col overflow-hidden rounded-xl bg-card',
+        'transition-shadow duration-200 ease-out',
+        live ? 'aurora-border' : 'border border-border/60 hover:shadow-md'
+      )}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-5 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500">
+      <div className="flex items-start justify-between gap-3 p-6 pb-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Sparkles size={14} />
-          </div>
+          </span>
           <div>
-            <h3 className="text-sm font-medium text-foreground">AI Sales Insights</h3>
-            <p className="text-[10px] text-muted-foreground">Powered by Gemini</p>
+            <h3 className="text-[13px] font-semibold tracking-tight text-foreground">
+              AI Sales Insights
+            </h3>
+            <p className="text-[11px] text-muted-foreground">Powered by Gemini</p>
           </div>
         </div>
+
         {!data && !isFetching && (
-          <button 
+          <button
+            type="button"
             onClick={() => refetch()}
-            className="flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20"
+            className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors duration-150 hover:bg-primary/15"
           >
-            Analyze Pipeline
+            Analyze
           </button>
         )}
       </div>
 
-      <div className="flex-1 px-5 pb-5">
+      <div className="flex-1 px-6 pb-6">
         <AnimatePresence mode="wait">
           {!data && !isFetching && !isError && (
-            <motion.div 
+            <motion.div
               key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex h-full flex-col items-center justify-center text-center space-y-2"
+              transition={{ duration: DURATION.fast }}
+              className="flex h-full flex-col items-center justify-center text-center"
             >
-              <p className="text-xs text-muted-foreground">
-                Run AI analysis to spot pipeline risks and opportunities instantly.
+              <p className="max-w-[26ch] text-xs leading-relaxed text-muted-foreground">
+                Run an analysis to surface pipeline risks and opportunities.
               </p>
             </motion.div>
           )}
 
           {isFetching && (
-            <motion.div 
+            <motion.div
               key="loading"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex h-full flex-col items-center justify-center space-y-3"
+              transition={{ duration: DURATION.fast }}
+              className="flex h-full flex-col items-center justify-center gap-2.5"
             >
-              <Loader2 className="animate-spin text-indigo-500" size={24} />
-              <p className="animate-pulse text-xs text-muted-foreground">Analyzing pipeline data...</p>
+              <Loader2 className="animate-spin text-primary" size={20} />
+              <p className="text-xs text-muted-foreground">Reading your pipeline…</p>
             </motion.div>
           )}
 
           {isError && (
-            <motion.div 
+            <motion.div
               key="error"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex h-full flex-col items-center justify-center text-destructive"
+              transition={{ duration: DURATION.fast }}
+              className="flex h-full flex-col items-center justify-center gap-1.5 text-center"
             >
-              <p className="text-xs font-medium">Analysis failed.</p>
-              <button onClick={() => refetch()} className="mt-2 text-xs underline">Try again</button>
+              <p className="text-xs font-medium text-destructive">Analysis failed</p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="text-xs font-medium text-muted-foreground underline-offset-2 transition-colors duration-150 hover:text-foreground hover:underline"
+              >
+                Try again
+              </button>
             </motion.div>
           )}
 
           {data && !isFetching && (
-            <motion.div 
+            <motion.div
               key="data"
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: DURATION.normal, ease: EASE_OUT }}
               className="flex h-full flex-col justify-between"
             >
-              <div className="space-y-2.5 mt-2">
+              <ul className="space-y-2.5">
                 {data.insights.slice(0, 3).map((insight: any, i: number) => {
-                  let Icon = Info;
-                  let colorClass = 'text-blue-500';
-                  
-                  if (insight.type === 'positive') {
-                    Icon = CheckCircle2;
-                    colorClass = 'text-green-500';
-                  } else if (insight.type === 'warning') {
-                    Icon = AlertTriangle;
-                    colorClass = 'text-amber-500';
-                  }
+                  const { Icon, className } =
+                    INSIGHT_STYLES[insight.type as keyof typeof INSIGHT_STYLES] ??
+                    INSIGHT_STYLES.default;
 
                   return (
-                    <div key={i} className="flex items-start gap-2 text-xs">
-                      <Icon size={14} className={`shrink-0 mt-0.5 ${colorClass}`} />
-                      <p className="text-foreground leading-snug">{insight.text}</p>
-                    </div>
+                    <motion.li
+                      key={i}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: DURATION.normal,
+                        ease: EASE_OUT,
+                        delay: i * 0.05,
+                      }}
+                      className="flex items-start gap-2"
+                    >
+                      <Icon size={13} className={cn('mt-0.5 shrink-0', className)} />
+                      <p className="text-xs leading-relaxed text-foreground">
+                        {insight.text}
+                      </p>
+                    </motion.li>
                   );
                 })}
-              </div>
+              </ul>
 
               {data.pipelineSummary && (
-                <div className="mt-3 flex items-center justify-between rounded-md bg-muted/50 p-2 text-[10px] font-medium">
-                  <div className="flex flex-col">
-                    <span className="text-muted-foreground">Pipeline</span>
-                    <span className="text-foreground">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data.pipelineSummary.value || 0)}</span>
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/40 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Pipeline
+                    </p>
+                    <p className="truncate text-xs font-medium tabular-nums text-foreground">
+                      {formatCurrency(data.pipelineSummary.value)}
+                    </p>
                   </div>
-                  <div className="flex flex-col text-right">
-                    <span className="text-muted-foreground">Top Source</span>
-                    <span className="text-foreground">{data.pipelineSummary.topSource}</span>
+                  <div className="min-w-0 text-right">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Top source
+                    </p>
+                    <p className="truncate text-xs font-medium text-foreground">
+                      {data.pipelineSummary.topSource}
+                    </p>
                   </div>
                 </div>
               )}

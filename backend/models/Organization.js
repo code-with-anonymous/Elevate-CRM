@@ -44,6 +44,19 @@ const organizationSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // ── Org-wide display defaults ────────────────────────────────────────────
+    // The API always stores and returns UTC; these only affect presentation,
+    // and only where a user hasn't set their own preference.
+    timezone: {
+      type: String,
+      default: 'UTC',
+      trim: true,
+    },
+    dateFormat: {
+      type: String,
+      enum: ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'],
+      default: 'DD/MM/YYYY',
+    },
   },
   { timestamps: true }
 );

@@ -1,24 +1,29 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // src/components/layout/Sidebar.tsx
-// Collapsed icon-only sidebar — dark bg, tooltips, active states
+// Icon rail. Active state is a 2px accent bar plus a tinted glyph — no filled
+// pill. The rail stays dark in both themes, the way Linear and Vercel keep a
+// constant chrome edge regardless of canvas.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-  LayoutDashboard,
-  Users,
-  UserCircle,
-  GitBranch,
-  CheckSquare,
-  Calendar,
+  Activity,
   BarChart3,
+  Calendar,
+  CheckSquare,
+  GitBranch,
+  LayoutDashboard,
   Settings,
-  Zap,
+  UserCircle,
+  Users,
   UsersRound,
+  Zap,
 } from 'lucide-react';
 import { ROUTES } from '@/constants';
 import { useAuthStore } from '@/store/authStore';
+import { cn } from '@/lib/cn';
+import { DURATION, EASE_OUT } from '@/lib/motion';
 
 // ── Nav item type ─────────────────────────────────────────────────────────────
 
@@ -29,30 +34,30 @@ interface NavItem {
   badge?: number;
 }
 
+const ICON = 19;
+
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: ROUTES.DASHBOARD },
-  { label: 'Contacts', icon: <UserCircle size={20} />, path: ROUTES.CONTACTS },
-  { label: 'Leads', icon: <Users size={20} />, path: ROUTES.LEADS },
-  { label: 'Pipeline', icon: <GitBranch size={20} />, path: '/pipeline' },
-  { label: 'Tasks', icon: <CheckSquare size={20} />, path: ROUTES.TASKS },
-  { label: 'Calendar', icon: <Calendar size={20} />, path: ROUTES.CALENDAR },
-  { label: 'Teams', icon: <UsersRound size={20} />, path: ROUTES.TEAMS },
-  { label: 'Reports', icon: <BarChart3 size={20} />, path: ROUTES.REPORTS },
+  { label: 'Dashboard', icon: <LayoutDashboard size={ICON} />, path: ROUTES.DASHBOARD },
+  { label: 'Contacts', icon: <UserCircle size={ICON} />, path: ROUTES.CONTACTS },
+  { label: 'Leads', icon: <Users size={ICON} />, path: ROUTES.LEADS },
+  { label: 'Pipeline', icon: <GitBranch size={ICON} />, path: '/pipeline' },
+  { label: 'Tasks', icon: <CheckSquare size={ICON} />, path: ROUTES.TASKS },
+  { label: 'Calendar', icon: <Calendar size={ICON} />, path: ROUTES.CALENDAR },
+  { label: 'Activity', icon: <Activity size={ICON} />, path: ROUTES.ACTIVITY },
+  // Repointed from ROUTES.TEAMS (/dashboard/teams), which renders the mock
+  // single-row TeamsPage from before the team API existed. /settings/team is the
+  // real one — roles, invites, removal, all server-enforced.
+  { label: 'Team', icon: <UsersRound size={ICON} />, path: ROUTES.SETTINGS.TEAM },
+  { label: 'Reports', icon: <BarChart3 size={ICON} />, path: ROUTES.REPORTS },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
-  { label: 'Settings', icon: <Settings size={20} />, path: ROUTES.SETTINGS.ROOT },
+  { label: 'Settings', icon: <Settings size={ICON} />, path: ROUTES.SETTINGS.ROOT },
 ];
 
-// ── Tooltip wrapper ───────────────────────────────────────────────────────────
+// ── Tooltip ───────────────────────────────────────────────────────────────────
 
-function SidebarTooltip({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function SidebarTooltip({ label, children }: { label: string; children: ReactNode }) {
   const [show, setShow] = useState(false);
 
   return (
@@ -60,19 +65,21 @@ function SidebarTooltip({
       className="relative flex items-center"
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
+      onFocus={() => setShow(true)}
+      onBlur={() => setShow(false)}
     >
       {children}
       <AnimatePresence>
         {show && (
           <motion.div
+            role="tooltip"
             initial={{ opacity: 0, x: -4 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -4 }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-full ml-3 z-50 rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background shadow-lg whitespace-nowrap"
+            transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+            className="pointer-events-none absolute left-full z-50 ml-3 whitespace-nowrap rounded-md border border-sidebar-border bg-sidebar-popover px-2 py-1 text-[11px] font-medium tracking-tight text-sidebar-foreground shadow-pop"
           >
             {label}
-            <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-foreground" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -80,86 +87,90 @@ function SidebarTooltip({
   );
 }
 
-// ── Sidebar component ─────────────────────────────────────────────────────────
+// ── Nav link ──────────────────────────────────────────────────────────────────
+
+function RailLink({ item, active }: { item: NavItem; active: boolean }) {
+  return (
+    <SidebarTooltip label={item.label}>
+      <NavLink
+        to={item.path}
+        aria-label={item.label}
+        aria-current={active ? 'page' : undefined}
+        className={cn(
+          'relative flex h-10 w-10 items-center justify-center rounded-lg',
+          'transition-colors duration-150',
+          active
+            ? 'text-sidebar-primary'
+            : 'text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
+        )}
+      >
+        {item.icon}
+        {active && (
+          <motion.span
+            layoutId="sidebar-active-bar"
+            transition={{ duration: DURATION.normal, ease: EASE_OUT }}
+            className="absolute -left-3 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-r-full bg-sidebar-primary"
+          />
+        )}
+      </NavLink>
+    </SidebarTooltip>
+  );
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
 
-  const isActive = (path: string): boolean => {
-    if (path === ROUTES.DASHBOARD) return location.pathname === ROUTES.DASHBOARD;
-    return location.pathname.startsWith(path);
-  };
+  // Longest match wins, and only one item is ever active.
+  //
+  // The old rule was `pathname.startsWith(path)` with a special case for
+  // Dashboard. That broke the moment Team started pointing at /settings/team:
+  // on that route BOTH "Team" (/settings/team) and "Settings" (/settings)
+  // matched, so two rail items lit up at once.
+  //
+  // Segment-aware too — plain startsWith would make '/leadsomething' match
+  // '/leads', and exact equality alone would leave '/leads/:id' with nothing
+  // highlighted.
+  const activePath = useMemo(() => {
+    const { pathname } = location;
+    return [...NAV_ITEMS, ...BOTTOM_ITEMS]
+      .map((item) => item.path)
+      .filter((path) => pathname === path || pathname.startsWith(`${path}/`))
+      .sort((a, b) => b.length - a.length)[0];
+  }, [location]);
+
+  const isActive = (path: string): boolean => path === activePath;
 
   const userInitials = user
     ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
     : 'U';
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 flex w-[68px] flex-col items-center bg-sidebar py-5">
-      {/* Logo */}
-      <div className="mb-8 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-600/25">
-        <Zap size={20} className="text-white" />
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[68px] flex-col items-center border-r border-sidebar-border bg-sidebar py-5 md:flex">
+      {/* Mark */}
+      <div className="accent-gradient mb-7 flex h-9 w-9 items-center justify-center rounded-[10px] shadow-sm">
+        <Zap size={17} className="fill-white text-white" />
       </div>
 
-      {/* Primary nav */}
       <nav className="flex flex-1 flex-col items-center gap-1">
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item.path);
-          return (
-            <SidebarTooltip key={item.path} label={item.label}>
-              <NavLink
-                to={item.path}
-                className={`group relative flex h-10 w-10 items-center justify-center rounded-lg transition-all duration-200 ${
-                  active
-                    ? 'bg-sidebar-accent text-blue-400'
-                    : 'text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                }`}
-                aria-label={item.label}
-              >
-                {item.icon}
-                {active && (
-                  <motion.div
-                    layoutId="sidebar-active-indicator"
-                    className="absolute -left-[10px] top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-blue-400"
-                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                  />
-                )}
-              </NavLink>
-            </SidebarTooltip>
-          );
-        })}
+        {NAV_ITEMS.map((item) => (
+          <RailLink key={item.path} item={item} active={isActive(item.path)} />
+        ))}
       </nav>
 
-      {/* Bottom nav */}
       <div className="flex flex-col items-center gap-1 pt-2">
-        {BOTTOM_ITEMS.map((item) => {
-          const active = isActive(item.path);
-          return (
-            <SidebarTooltip key={item.path} label={item.label}>
-              <NavLink
-                to={item.path}
-                className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all duration-200 ${
-                  active
-                    ? 'bg-sidebar-accent text-blue-400'
-                    : 'text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                }`}
-                aria-label={item.label}
-              >
-                {item.icon}
-              </NavLink>
-            </SidebarTooltip>
-          );
-        })}
+        {BOTTOM_ITEMS.map((item) => (
+          <RailLink key={item.path} item={item} active={isActive(item.path)} />
+        ))}
 
-        {/* Divider */}
-        <div className="my-2 h-px w-8 bg-sidebar-border" />
+        <div className="my-2 h-px w-7 bg-sidebar-border" />
 
-        {/* User avatar */}
         <SidebarTooltip label={user ? `${user.firstName} ${user.lastName}` : 'Profile'}>
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-semibold text-white shadow-md transition-transform hover:scale-105"
+            className="accent-gradient flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold text-white ring-1 ring-white/10 transition-opacity duration-150 hover:opacity-90"
             aria-label="User profile"
           >
             {userInitials}

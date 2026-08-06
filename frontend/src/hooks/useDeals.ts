@@ -5,6 +5,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dealService, type CreateDealPayload, type DealStage, type GetDealsParams, type UpdateDealPayload } from '@services/api/dealService';
+import { CALENDAR_QK } from '@hooks/useCalendar';
 import toast from 'react-hot-toast';
 
 // ── Query keys ────────────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ export function useCreateDeal() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: DEALS_QK.all });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: CALENDAR_QK.all });
       toast.success('Deal created');
     },
     onError: () => toast.error('Failed to create deal'),
@@ -61,6 +63,7 @@ export function useUpdateDeal(id: string) {
       qc.invalidateQueries({ queryKey: DEALS_QK.all });
       qc.setQueryData(DEALS_QK.detail(id), updated);
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: CALENDAR_QK.all });
       toast.success('Deal updated');
     },
     onError: () => toast.error('Failed to update deal'),
@@ -77,6 +80,7 @@ export function useMoveDealStage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: DEALS_QK.all });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: CALENDAR_QK.all });
     },
     onError: () => {
       // Revert optimistic update
@@ -95,6 +99,7 @@ export function useDeleteDeal() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: DEALS_QK.all });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: CALENDAR_QK.all });
       toast.success('Deal deleted');
     },
     onError: () => toast.error('Failed to delete deal'),

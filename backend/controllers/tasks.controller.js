@@ -7,6 +7,7 @@
 const Task = require('../models/Task');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
+const { safeRegexClause } = require('../utils/escapeRegex');
 
 const getOrgId = (req) => req.organizationId || req.user?.organizationId;
 
@@ -40,7 +41,7 @@ exports.getTasks = catchAsync(async (req, res) => {
   }
 
   if (search) {
-    filter.title = { $regex: search, $options: 'i' };
+    filter.title = safeRegexClause(search);
   }
 
   const skip = (Number(page) - 1) * Number(limit);

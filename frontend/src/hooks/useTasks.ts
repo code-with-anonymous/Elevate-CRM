@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskService, TaskItem, GetTasksParams } from '@/services/api/taskService';
+import { CALENDAR_QK } from '@/hooks/useCalendar';
 import toast from 'react-hot-toast';
 
 export const TASKS_QK = {
@@ -32,6 +33,7 @@ export function useCreateTask() {
       toast.success('Task created');
       queryClient.invalidateQueries({ queryKey: TASKS_QK.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: CALENDAR_QK.all });
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to create task');
@@ -49,6 +51,7 @@ export function useUpdateTask() {
       queryClient.invalidateQueries({ queryKey: TASKS_QK.all });
       queryClient.invalidateQueries({ queryKey: TASKS_QK.detail(variables.id) });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: CALENDAR_QK.all });
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to update task');
@@ -64,6 +67,7 @@ export function useCompleteTask() {
       toast.success('Task marked complete');
       queryClient.invalidateQueries({ queryKey: TASKS_QK.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: CALENDAR_QK.all });
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to complete task');
@@ -79,6 +83,7 @@ export function useDeleteTask() {
       toast.success('Task deleted');
       queryClient.invalidateQueries({ queryKey: TASKS_QK.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: CALENDAR_QK.all });
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to delete task');

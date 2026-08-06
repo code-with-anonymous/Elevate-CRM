@@ -7,6 +7,7 @@
 const Contact    = require('../models/Contact');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
+const { safeRegexClause } = require('../utils/escapeRegex');
 
 const getOrgId = (req) => req.organizationId || req.user?.organizationId;
 
@@ -29,16 +30,17 @@ exports.getContacts = catchAsync(async (req, res) => {
   const filter = { organizationId: orgId, isDeleted: false };
 
   if (status)     filter.status     = status;
-  if (company)    filter.company    = { $regex: company, $options: 'i' };
+  if (company)    filter.company    = safeRegexClause(company);
   if (assignedTo) filter.assignedTo = assignedTo;
   if (tags)       filter.tags       = { $in: Array.isArray(tags) ? tags : [tags] };
 
   if (search) {
+    const clause = safeRegexClause(search);
     filter.$or = [
-      { firstName: { $regex: search, $options: 'i' } },
-      { lastName:  { $regex: search, $options: 'i' } },
-      { email:     { $regex: search, $options: 'i' } },
-      { company:   { $regex: search, $options: 'i' } },
+      { firstName: clause },
+      { lastName:  clause },
+      { email:     clause },
+      { company:   clause },
     ];
   }
 

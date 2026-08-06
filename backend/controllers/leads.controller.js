@@ -6,6 +6,7 @@ const User = require('../models/User');
 const ApiResponse = require('../utils/ApiResponse');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
+const { escapeRegex } = require('../utils/escapeRegex');
 
 // GET /api/leads
 const getLeads = asyncHandler(async (req, res) => {
@@ -31,7 +32,9 @@ const getLeads = asyncHandler(async (req, res) => {
   }
 
   if (req.query.search) {
-    const searchRegex = new RegExp(req.query.search, 'i');
+    // Escaped via utils/escapeRegex — unescaped, `.*` matches every lead in the
+    // org and `(((` throws a SyntaxError out of the RegExp constructor.
+    const searchRegex = new RegExp(escapeRegex(req.query.search), 'i');
     filter.$or = [
       { firstName: searchRegex },
       { lastName: searchRegex },

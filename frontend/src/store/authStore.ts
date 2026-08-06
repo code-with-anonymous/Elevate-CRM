@@ -26,6 +26,23 @@ import { UserRole as UserRoleEnum } from '@/types/auth';
 
 const DEFAULT_ROLE = UserRoleEnum.VIEWER;
 
+/**
+ * The API sends roles lowercase ('owner') because that's the Mongoose enum;
+ * UserRole is uppercase ('OWNER'). The User type claims they're the same, so
+ * TypeScript never caught it — but at runtime `roleHierarchy['owner']` is
+ * undefined, which made hasRole() return false for everyone including owners.
+ * Nothing surfaced it because no route passed `requiredRole` until now.
+ *
+ * Normalized once, here at the boundary. `user.role` is deliberately left as
+ * the server sent it — TeamsPage and friends lowercase it for their own lookups.
+ */
+function normalizeRole(role: unknown): UserRole {
+  const upper = String(role ?? '').toUpperCase();
+  return (Object.values(UserRoleEnum) as string[]).includes(upper)
+    ? (upper as UserRole)
+    : DEFAULT_ROLE;
+}
+
 // ── Store ──────────────────────────────────────────────────────────────────────
 
 export const useAuthStore = create<AuthStoreInternal>()(
@@ -60,7 +77,7 @@ export const useAuthStore = create<AuthStoreInternal>()(
           isAuthenticated: true,
           isLoading: false,
           permissions: user.permissions,
-          role: user.role,
+          role: normalizeRole(user.role),
           sessionExpiry: expiry,
           pendingTwoFactor: false,
           otpDestination: null,
@@ -97,7 +114,7 @@ export const useAuthStore = create<AuthStoreInternal>()(
           user: updated,
           // Update permissions/role if they changed
           ...(partial.permissions !== undefined && { permissions: partial.permissions }),
-          ...(partial.role !== undefined && { role: partial.role }),
+          ...(partial.role !== undefined && { role: normalizeRole(partial.role) }),
         });
       },
 

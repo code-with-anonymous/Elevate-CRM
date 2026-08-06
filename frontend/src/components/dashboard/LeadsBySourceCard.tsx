@@ -1,85 +1,111 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// src/components/dashboard/LeadsBySourceCard.tsx
+// Donut + legend. Source colors now come from the shared categorical ramp
+// instead of six hardcoded hexes, so the chart retunes with the theme and
+// matches every other series in the app.
+// ─────────────────────────────────────────────────────────────────────────────
+import { Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart as PieIcon } from 'lucide-react';
 import { useLeadsBySource } from '@/hooks/useDashboard';
-import { Skeleton } from '@/components/ui/skeleton';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-
+import { CATEGORICAL_SERIES, tooltipStyle } from '@/lib/chartTheme';
+import { formatNumber } from '@/lib/format';
 import CardErrorState from '@/components/dashboard/CardErrorState';
+import { DashCard, DashCardHeader, DashCardSkeleton } from '@/components/dashboard/DashCard';
+
+// Stable slot per known source, so a given channel keeps its color between
+// refetches even when the ordering of the response changes.
+const SOURCE_SLOT: Record<string, number> = {
+  'Cold Outreach': 0,
+  Event: 1,
+  Social: 2,
+  Website: 3,
+  Referral: 4,
+  Other: 6,
+};
 
 export default function LeadsBySourceCard() {
   const { data, isLoading, isError, refetch } = useLeadsBySource();
 
   if (isLoading) {
-    return <Skeleton className="min-h-[250px] w-full rounded-xl border border-border" />;
+    return <DashCardSkeleton className="min-h-[250px] w-full" lines={1} showChart />;
   }
 
   if (isError) {
     return <CardErrorState onRetry={() => refetch()} heightClass="min-h-[250px]" />;
   }
 
-  // Pre-defined colors for standard sources
-  const COLORS: Record<string, string> = {
-    'Cold Outreach': '#3B82F6',
-    'Event': '#8B5CF6',
-    'Social': '#10B981',
-    'Website': '#F59E0B',
-    'Referral': '#EF4444',
-    'Other': '#6B7280'
-  };
+  const sourcesArray = Array.isArray(data) ? data : data?.sources || [];
 
-  const sourcesArray = Array.isArray(data) 
-    ? data 
-    : (data?.sources || []);
+  const chartData = sourcesArray.map((item: any, index: number) => {
+    const name = item.source || item.name;
+    const slot = SOURCE_SLOT[name] ?? index;
+    return {
+      name,
+      value: item.count || item.value,
+      fill: CATEGORICAL_SERIES[slot % CATEGORICAL_SERIES.length],
+    };
+  });
 
-  const chartData = sourcesArray.map((item: any) => ({
-    name: item.source || item.name,
-    value: item.count || item.value,
-    color: COLORS[item.source || item.name] || COLORS['Other']
-  }));
+  const total = chartData.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
 
   return (
-    <div className="flex min-h-[250px] flex-col rounded-xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md h-full">
-      <div className="mb-2">
-        <h3 className="text-sm font-medium text-foreground">Leads by Source</h3>
-        <p className="text-xs text-muted-foreground">Distribution across channels</p>
-      </div>
+    <DashCard interactive className="h-full min-h-[250px] p-6">
+      <DashCardHeader title="Leads by Source" subtitle="Distribution across channels" />
 
-      <div className="flex-1 flex flex-col md:flex-row items-center gap-4">
-        <div className="h-[140px] w-full md:w-1/2 relative">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={45}
-                outerRadius={65}
-                paddingAngle={2}
-                dataKey="value"
-                stroke="none"
-              >
-                {chartData.map((entry: any, index: number) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--color-border))', backgroundColor: 'hsl(var(--color-card))', boxShadow: 'var(--shadow-sm)' }}
-                itemStyle={{ color: 'hsl(var(--color-foreground))', fontWeight: 500 }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+      {chartData.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <PieIcon size={20} className="mb-2 text-muted-foreground/60" />
+          <p className="text-xs text-muted-foreground">No source data yet.</p>
         </div>
-        
-        <div className="flex flex-col gap-2 w-full md:w-1/2">
-          {chartData.map((item: any, index: number) => (
-            <div key={index} className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-foreground">{item.name}</span>
-              </div>
-              <span className="font-medium text-muted-foreground">{item.value}</span>
+      ) : (
+        <div className="mt-3 flex flex-1 flex-col items-center gap-4 md:flex-row">
+          <div className="relative h-[140px] w-full md:w-1/2">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={46}
+                  outerRadius={64}
+                  paddingAngle={2}
+                  cornerRadius={3}
+                  dataKey="value"
+                  stroke="none"
+                />
+                <Tooltip {...tooltipStyle} />
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Total lives in the hole — the donut's whole reason to exist */}
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-lg font-semibold tabular-nums tracking-tight text-foreground">
+                {formatNumber(total)}
+              </span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Leads
+              </span>
             </div>
-          ))}
+          </div>
+
+          <ul className="flex w-full flex-col gap-2 md:w-1/2">
+            {chartData.map((item: any) => (
+              <li key={item.name} className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: item.fill }}
+                  />
+                  <span className="truncate text-foreground">{item.name}</span>
+                </span>
+                <span className="shrink-0 font-medium tabular-nums text-muted-foreground">
+                  {formatNumber(item.value)}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
-    </div>
+      )}
+    </DashCard>
   );
 }

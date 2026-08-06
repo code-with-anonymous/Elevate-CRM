@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // routes/tasks.routes.js
+// RBAC policy matches leads.routes.js — read/viewer, write/member, delete/manager.
 // ─────────────────────────────────────────────────────────────────────────────
 'use strict';
 
@@ -7,6 +8,7 @@ const express = require('express');
 const router  = express.Router();
 
 const { protect } = require('../middleware/auth');
+const { requireMinRole } = require('../middleware/rbac');
 const {
   getTasks,
   getTask,
@@ -18,15 +20,19 @@ const {
 
 router.use(protect);
 
+const canWrite = requireMinRole('member');
+const canDelete = requireMinRole('manager');
+
 router.route('/')
   .get(getTasks)
-  .post(createTask);
+  .post(canWrite, createTask);
 
 router.route('/:id')
   .get(getTask)
-  .patch(updateTask)
-  .delete(deleteTask);
+  .patch(canWrite, updateTask)
+  .delete(canDelete, deleteTask);
 
-router.patch('/:id/complete', completeTask);
+// Completing a task is a write, not a delete — members tick their own boxes.
+router.patch('/:id/complete', canWrite, completeTask);
 
 module.exports = router;

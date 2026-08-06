@@ -1,11 +1,22 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// src/components/leads/AddLeadDrawer.tsx
+// Visual pass only — the zod schema, react-hook-form wiring, the create
+// mutation and its exact invalidation keys are untouched.
+// Motion moved off a spring onto the shared drawer easing, so it settles
+// precisely instead of overshooting.
+// ─────────────────────────────────────────────────────────────────────────────
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { leadsService } from '@/services/api/leadsService';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import toast from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Field, controlClass, errorControlClass, selectClass } from '@/components/ui/field';
+import { drawerVariants, overlayVariants } from '@/lib/motion';
+import { cn } from '@/lib/cn';
 
 const leadSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -25,6 +36,9 @@ interface AddLeadDrawerProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+const SOURCES = ['Cold Outreach', 'Event', 'Social', 'Website', 'Referral', 'Other'];
+const STATUSES = ['New', 'Contacted', 'Qualified', 'Proposal', 'Won', 'Lost'];
 
 export default function AddLeadDrawer({ isOpen, onClose }: AddLeadDrawerProps) {
   const queryClient = useQueryClient();
@@ -89,180 +103,159 @@ export default function AddLeadDrawer({ isOpen, onClose }: AddLeadDrawerProps) {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop Overlay */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.4 }}
-            exit={{ opacity: 0 }}
+            variants={overlayVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             onClick={onClose}
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-40 bg-overlay/40 backdrop-blur-[2px]"
           />
 
-          {/* Drawer Panel */}
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed bottom-0 right-0 top-0 z-50 w-full max-w-md border-l border-border bg-card shadow-2xl flex flex-col h-screen"
+            variants={drawerVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add new lead"
+            className="fixed bottom-0 right-0 top-0 z-50 flex h-screen w-full max-w-md flex-col border-l border-border/60 bg-card shadow-pop"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-border p-5">
+            <div className="flex items-start justify-between gap-3 border-b border-border/60 px-6 py-5">
               <div>
-                <h2 className="text-lg font-semibold text-foreground">Add New Lead</h2>
-                <p className="text-xs text-muted-foreground">Fill in the pipeline details</p>
+                <h2 className="text-base font-semibold tracking-tight text-foreground">
+                  Add new lead
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Fill in the pipeline details
+                </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Form Content */}
-            <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">First Name</label>
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="flex flex-1 flex-col overflow-hidden"
+            >
+              <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="First name" htmlFor="firstName" required error={errors.firstName?.message}>
+                    <input
+                      id="firstName"
+                      type="text"
+                      {...register('firstName')}
+                      className={cn(controlClass, errors.firstName && errorControlClass)}
+                    />
+                  </Field>
+
+                  <Field label="Last name" htmlFor="lastName" required error={errors.lastName?.message}>
+                    <input
+                      id="lastName"
+                      type="text"
+                      {...register('lastName')}
+                      className={cn(controlClass, errors.lastName && errorControlClass)}
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Email" htmlFor="email" error={errors.email?.message}>
                   <input
+                    id="email"
+                    type="email"
+                    placeholder="name@company.com"
+                    {...register('email')}
+                    className={cn(controlClass, errors.email && errorControlClass)}
+                  />
+                </Field>
+
+                <Field label="Phone" htmlFor="phone">
+                  <input
+                    id="phone"
                     type="text"
-                    {...register('firstName')}
-                    className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20"
+                    {...register('phone')}
+                    className={controlClass}
                   />
-                  {errors.firstName && (
-                    <p className="mt-1 text-2xs text-red-500">{errors.firstName.message}</p>
-                  )}
-                </div>
+                </Field>
 
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Last Name</label>
+                <Field label="Company" htmlFor="company">
                   <input
+                    id="company"
                     type="text"
-                    {...register('lastName')}
-                    className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20"
+                    {...register('company')}
+                    className={controlClass}
                   />
-                  {errors.lastName && (
-                    <p className="mt-1 text-2xs text-red-500">{errors.lastName.message}</p>
-                  )}
+                </Field>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Lead source" htmlFor="source">
+                    <select id="source" {...register('source')} className={selectClass}>
+                      {SOURCES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Lead status" htmlFor="status">
+                    <select id="status" {...register('status')} className={selectClass}>
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Value (USD)" htmlFor="value" error={errors.value?.message}>
+                    <input
+                      id="value"
+                      type="number"
+                      {...register('value')}
+                      className={cn(
+                        controlClass,
+                        'tabular-nums',
+                        errors.value && errorControlClass
+                      )}
+                    />
+                  </Field>
+
+                  <Field label="Assigned to" htmlFor="assignedTo">
+                    <select id="assignedTo" {...register('assignedTo')} className={selectClass}>
+                      <option value="">Unassigned</option>
+                      {users.map((u: any) => (
+                        <option key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Email</label>
-                <input
-                  type="email"
-                  {...register('email')}
-                  className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20"
-                />
-                {errors.email && (
-                  <p className="mt-1 text-2xs text-red-500">{errors.email.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Phone</label>
-                <input
-                  type="text"
-                  {...register('phone')}
-                  className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Company</label>
-                <input
-                  type="text"
-                  {...register('company')}
-                  className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Lead Source</label>
-                  <select
-                    {...register('source')}
-                    className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20"
-                  >
-                    <option value="Cold Outreach">Cold Outreach</option>
-                    <option value="Event">Event</option>
-                    <option value="Social">Social</option>
-                    <option value="Website">Website</option>
-                    <option value="Referral">Referral</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Lead Status</label>
-                  <select
-                    {...register('status')}
-                    className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20"
-                  >
-                    <option value="New">New</option>
-                    <option value="Contacted">Contacted</option>
-                    <option value="Qualified">Qualified</option>
-                    <option value="Proposal">Proposal</option>
-                    <option value="Won">Won</option>
-                    <option value="Lost">Lost</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Value (USD)</label>
-                  <input
-                    type="number"
-                    {...register('value')}
-                    className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20"
-                  />
-                  {errors.value && (
-                    <p className="mt-1 text-2xs text-red-500">{errors.value.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Assigned To</label>
-                  <select
-                    {...register('assignedTo')}
-                    className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20"
-                  >
-                    <option value="">Unassigned</option>
-                    {users.map((u: any) => (
-                      <option key={u.id} value={u.id}>
-                        {u.firstName} {u.lastName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="border-t border-border pt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 h-10 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted"
-                >
+              {/* Footer stays docked so the primary action is always reachable */}
+              <div className="flex gap-2 border-t border-border/60 px-6 py-4">
+                <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  disabled={createLeadMutation.isPending}
-                  className="flex-1 h-10 rounded-lg bg-blue-500 text-sm font-semibold text-white hover:bg-blue-600 flex items-center justify-center gap-1.5"
+                  className="flex-1"
+                  isLoading={createLeadMutation.isPending}
                 >
-                  {createLeadMutation.isPending ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Add Lead'
-                  )}
-                </button>
+                  Add lead
+                </Button>
               </div>
             </form>
           </motion.div>

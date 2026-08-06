@@ -9,6 +9,7 @@ const Deal        = require('../models/Deal');
 const Contact     = require('../models/Contact');
 const ApiError = require('../utils/ApiError');
 const catchAsync  = require('../utils/catchAsync');
+const { safeRegexClause } = require('../utils/escapeRegex');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ exports.getDeals = catchAsync(async (req, res) => {
   if (assignedTo) filter.assignedTo = assignedTo;
 
   if (search) {
-    filter.title = { $regex: search, $options: 'i' };
+    filter.title = safeRegexClause(search);
   }
 
   const skip  = (Number(page) - 1) * Number(limit);

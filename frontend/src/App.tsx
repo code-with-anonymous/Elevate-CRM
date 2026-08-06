@@ -10,6 +10,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { router } from '@routes/index';
 import { RouterProvider } from 'react-router-dom';
 import { useAppBootstrap } from '@/hooks/useAuthActions';
+import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { useEffect } from 'react';
 
 const queryClient = new QueryClient({
@@ -39,7 +40,13 @@ function App(): React.JSX.Element {
   return (
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
-        <AppContent />
+        {/* Inside the providers, not outside: the fallback and any retry the
+            user triggers need the query client and Helmet context. Only
+            AppContent is wrapped, so a render error can't take the Toaster with
+            it — error toasts still work on the way down. */}
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
 
         <Toaster
           position="top-right"

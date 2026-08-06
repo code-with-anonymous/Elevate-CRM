@@ -95,6 +95,35 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // ── Notification preferences ──────────────────────────────────────────────
+    // A fixed subdocument rather than a free-form Map: every key is a real
+    // event the product knows about, so Mongoose applies defaults and rejects
+    // typos instead of silently storing `taskDueSon: {...}` forever.
+    //
+    // NOTE: nothing reads these yet — there is no notification emitter. They're
+    // stored honestly so the emitter has something to consult when it exists.
+    notificationPreferences: {
+      leadAssigned: {
+        inApp: { type: Boolean, default: true },
+        email: { type: Boolean, default: true },
+      },
+      taskDueSoon: {
+        inApp: { type: Boolean, default: true },
+        email: { type: Boolean, default: false },
+      },
+      dealWon: {
+        inApp: { type: Boolean, default: true },
+        email: { type: Boolean, default: false },
+      },
+      teamChanges: {
+        inApp: { type: Boolean, default: true },
+        email: { type: Boolean, default: false },
+      },
+      weeklySummary: {
+        inApp: { type: Boolean, default: false },
+        email: { type: Boolean, default: true },
+      },
+    },
   },
   { timestamps: true }
 );

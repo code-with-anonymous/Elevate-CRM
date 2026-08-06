@@ -1,100 +1,130 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// src/components/dashboard/PipelineEngagementChart.tsx
+// Period switch is now a segmented control. Chart colors come from
+// lib/chartTheme so the bars actually paint — the old `hsl(var(--color-primary))`
+// expanded to `hsl(hsl(…))` and resolved to nothing.
+// ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import { TrendingUp } from 'lucide-react';
 import { usePipelineChart } from '@/hooks/useDashboard';
-import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { motion, AnimatePresence } from 'framer-motion';
-
+import { axisTick, chartColor, tooltipStyle } from '@/lib/chartTheme';
+import { DURATION, EASE_OUT } from '@/lib/motion';
+import SegmentedControl from '@/components/ui/segmented-control';
 import CardErrorState from '@/components/dashboard/CardErrorState';
+import { DashCard, DashCardHeader } from '@/components/dashboard/DashCard';
+
+type Period = 'monthly' | 'annually';
+
+const PERIODS = [
+  { value: 'monthly' as const, label: 'Monthly' },
+  { value: 'annually' as const, label: 'Annually' },
+];
 
 export default function PipelineEngagementChart() {
-  const [period, setPeriod] = useState<'monthly' | 'annually'>('monthly');
+  const [period, setPeriod] = useState<Period>('monthly');
   const { data: chartResponse, isLoading, isError, refetch } = usePipelineChart(period);
 
-  const dataArray = Array.isArray(chartResponse)
-    ? chartResponse
-    : (chartResponse?.data || []);
+  const dataArray = Array.isArray(chartResponse) ? chartResponse : chartResponse?.data || [];
 
-  const chartData = dataArray.map((d: any) => ({
-    name: d.label || d.name,
-    value: d.value
-  }));
   const peakMonth = chartResponse?.peakMonth;
   const peakGrowth = chartResponse?.peakGrowth;
 
-  return (
-    <div className="flex h-[280px] flex-col rounded-xl border border-border bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h3 className="text-base font-semibold text-foreground">Pipeline Engagement</h3>
-          <p className="text-xs text-muted-foreground">New leads per {period === 'monthly' ? 'month' : 'year'}</p>
-        </div>
-        <div className="flex items-center rounded-lg bg-muted p-1">
-          <button
-            onClick={() => setPeriod('monthly')}
-            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${period === 'monthly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            Monthly
-          </button>
-          <button
-            onClick={() => setPeriod('annually')}
-            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${period === 'annually' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            Annually
-          </button>
-        </div>
-      </div>
+  // Per-bar color rides on the datum — Recharts 3 deprecated <Cell>. Only the
+  // peak month gets the full accent; the rest sit back at 28%.
+  const chartData = dataArray.map((d: any) => {
+    const name = d.label || d.name;
+    return {
+      name,
+      value: d.value,
+      fill: name === peakMonth ? chartColor.primary : chartColor.primaryMuted,
+    };
+  });
 
-      <div className="flex-1 min-h-0 w-full relative">
+  return (
+    <DashCard className="h-[300px] p-6">
+      <DashCardHeader
+        title="Pipeline Engagement"
+        subtitle={`New leads per ${period === 'monthly' ? 'month' : 'year'}`}
+        action={
+          <SegmentedControl
+            segments={PERIODS}
+            value={period}
+            onChange={setPeriod}
+            layoutId="pipeline-period"
+            aria-label="Chart period"
+          />
+        }
+      />
+
+      <div className="relative mt-5 min-h-0 w-full flex-1">
         {isLoading ? (
-          <Skeleton className="h-full w-full" />
+          <ChartSkeleton />
         ) : isError ? (
           <CardErrorState onRetry={() => refetch()} heightClass="h-full" />
         ) : (
           <>
-            {/* Peak growth badge */}
             <AnimatePresence>
               {peakMonth && peakGrowth !== null && peakGrowth !== undefined && (
                 <motion.div
-                  initial={{ opacity: 0, y: -8 }}
+                  initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="absolute top-0 right-2 z-10 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700 dark:bg-green-500/10 dark:text-green-400"
+                  transition={{ duration: DURATION.normal, ease: EASE_OUT }}
+                  className="absolute -top-1 right-0 z-10 inline-flex items-center gap-1 rounded-full bg-status-positive/10 px-2 py-0.5 text-[10px] font-medium tabular-nums text-status-positive ring-1 ring-inset ring-status-positive/20"
                 >
-                  Peak: {peakMonth} +{peakGrowth}%
+                  <TrendingUp size={10} />
+                  Peak {peakMonth} +{peakGrowth}%
                 </motion.div>
               )}
             </AnimatePresence>
+
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--color-border))" />
-                <XAxis 
-                  dataKey="name" 
+              <BarChart data={chartData} margin={{ top: 18, right: 0, left: 0, bottom: 0 }}>
+                <CartesianGrid
+                  strokeDasharray="2 4"
+                  vertical={false}
+                  stroke={chartColor.grid}
+                />
+                <XAxis
+                  dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: 'hsl(var(--color-muted-foreground))', fontSize: 12 }}
-                  dy={10}
+                  tick={axisTick}
+                  dy={8}
                 />
                 <Tooltip
-                  cursor={{ fill: 'hsl(var(--color-muted) / 0.4)' }}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--color-border))', backgroundColor: 'hsl(var(--color-card))', boxShadow: 'var(--shadow-sm)' }}
-                  itemStyle={{ color: 'hsl(var(--color-foreground))', fontWeight: 500 }}
+                  cursor={{ fill: 'hsl(var(--muted) / 0.5)', radius: 6 }}
+                  {...tooltipStyle}
                 />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={true}>
-                  {chartData?.map((entry: any, index: number) => {
-                    const isPeak = entry.name === peakMonth;
-                    return (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={isPeak ? 'hsl(var(--color-primary))' : 'hsl(var(--color-primary) / 0.3)'} 
-                      />
-                    );
-                  })}
-                </Bar>
+                <Bar
+                  dataKey="value"
+                  radius={[5, 5, 0, 0]}
+                  maxBarSize={38}
+                  isAnimationActive
+                />
               </BarChart>
             </ResponsiveContainer>
           </>
         )}
       </div>
+    </DashCard>
+  );
+}
+
+/** Bar-shaped skeleton so loading reads as a chart, not a grey slab. */
+function ChartSkeleton() {
+  const heights = [45, 70, 55, 85, 60, 95, 50, 75, 65, 90, 58, 80];
+  return (
+    <div className="flex h-full items-end gap-2 pb-6">
+      {heights.map((h, i) => (
+        <div
+          key={i}
+          className="flex-1 animate-pulse rounded-t-md bg-muted"
+          style={{ height: `${h}%`, animationDelay: `${i * 40}ms` }}
+        />
+      ))}
     </div>
   );
 }

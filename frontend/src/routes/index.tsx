@@ -12,6 +12,8 @@ import {
 import { ROUTES } from '@constants/index';
 import ProtectedRoute from './ProtectedRoute';
 import PublicRoute from './PublicRoute';
+import RoleRoute from './RoleRoute';
+import { UserRole } from '@/types/auth';
 
 // ── Global Loading Fallback ────────────────────────────────────────────────────
 
@@ -36,7 +38,10 @@ const VerifyEmailPage = lazy(() => import('@pages/auth/VerifyEmailPage'));
 const OtpPage = lazy(() => import('@pages/auth/OtpPage'));
 const TwoFactorPage = lazy(() => import('@pages/auth/TwoFactorPage'));
 const AcceptInvitePage = lazy(() => import('@pages/auth/AcceptInvitePage'));
-const ChangePasswordPage = lazy(() => import('@pages/auth/ChangePasswordPage'));
+// ChangePasswordPage is now ORPHANED. It used to be mounted at
+// /settings/security; that path is the Security tab now, and password change
+// lives in the Profile tab. The file is left on disk rather than deleted — that
+// call is yours, flagged for the Step 16 sweep.
 const SessionExpiredPage = lazy(() => import('@pages/auth/SessionExpiredPage'));
 const UnauthorizedPage = lazy(() => import('@pages/auth/UnauthorizedPage'));
 const AccessDeniedPage = lazy(() => import('@pages/auth/AccessDeniedPage'));
@@ -51,6 +56,17 @@ const LeadDetailPage  = lazy(() => import('@pages/leads/LeadDetailPage'));
 const PipelinePage    = lazy(() => import('@pages/pipeline/PipelinePage'));
 const ContactsPage    = lazy(() => import('@pages/contacts/ContactsPage'));
 const TasksPage       = lazy(() => import('@pages/tasks/TasksPage'));
+const CalendarPage    = lazy(() => import('@pages/calendar/CalendarPage'));
+const ReportsPage     = lazy(() => import('@pages/reports/ReportsPage'));
+
+// ── Settings ───────────────────────────────────────────────────────────────────
+const SettingsLayout       = lazy(() => import('@pages/settings/SettingsLayout'));
+const ProfileSettings      = lazy(() => import('@pages/settings/ProfileSettings'));
+const OrganizationSettings = lazy(() => import('@pages/settings/OrganizationSettings'));
+const TeamSettings         = lazy(() => import('@pages/settings/TeamSettings'));
+const SecuritySettings     = lazy(() => import('@pages/settings/SecuritySettings'));
+const NotificationSettings = lazy(() => import('@pages/settings/NotificationSettings'));
+const ActivityLogPage      = lazy(() => import('@pages/activity/ActivityLogPage'));
 const DashboardLayout = lazy(() => import('@components/layout/DashboardLayout'));
 
 // ── Suspense Wrapper ──────────────────────────────────────────────────────────
@@ -238,6 +254,37 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'calendar',
+        element: (
+          <Lazy>
+            <CalendarPage />
+          </Lazy>
+        ),
+      },
+      {
+        // No RoleRoute: the feed only surfaces events about records the user can
+        // already read, so gating it would hide a summary of visible data.
+        path: 'activity',
+        element: (
+          <Lazy>
+            <ActivityLogPage />
+          </Lazy>
+        ),
+      },
+      {
+        // Mirrors requireMinRole('manager') on /api/reports/*. The client guard
+        // is UX — it shows Access Denied instead of four failed requests — the
+        // server middleware is the actual control.
+        path: 'reports',
+        element: (
+          <Lazy>
+            <RoleRoute allowedRoles={[UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER]}>
+              <ReportsPage />
+            </RoleRoute>
+          </Lazy>
+        ),
+      },
+      {
         path: 'dashboard/teams',
         element: (
           <Lazy>
@@ -245,19 +292,73 @@ export const router = createBrowserRouter([
           </Lazy>
         ),
       },
-    ],
-  },
 
-  // ── Settings ───────────────────────────────────────────────────────────────
-  {
-    path: ROUTES.SETTINGS.SECURITY,
-    element: (
-      <Lazy>
-        <ProtectedRoute>
-          <ChangePasswordPage />
-        </ProtectedRoute>
-      </Lazy>
-    ),
+      // ── Settings ─────────────────────────────────────────────────────────
+      // Nested inside DashboardLayout so the sidebar and top bar stay put —
+      // the old /settings/security route sat OUTSIDE it and rendered a bare
+      // page with no navigation.
+      //
+      // Each tab is its own path, so it's linkable and reload-safe. Bare
+      // /settings redirects to the one tab everybody can reach.
+      {
+        path: 'settings',
+        element: (
+          <Lazy>
+            <SettingsLayout />
+          </Lazy>
+        ),
+        children: [
+          { index: true, element: <Navigate to={ROUTES.SETTINGS.PROFILE} replace /> },
+          {
+            path: 'profile',
+            element: (
+              <Lazy>
+                <ProfileSettings />
+              </Lazy>
+            ),
+          },
+          {
+            // Mirrors requireRole('owner','admin') on PATCH
+            // /api/organizations/current. SettingsLayout also hides the nav
+            // item — this is the guard that matters if someone types the URL.
+            path: 'organization',
+            element: (
+              <Lazy>
+                <RoleRoute allowedRoles={[UserRole.OWNER, UserRole.ADMIN]}>
+                  <OrganizationSettings />
+                </RoleRoute>
+              </Lazy>
+            ),
+          },
+          {
+            // No RoleRoute: GET /api/team/members is open to any member, and
+            // the page degrades to a read-only roster for lower roles.
+            path: 'team',
+            element: (
+              <Lazy>
+                <TeamSettings />
+              </Lazy>
+            ),
+          },
+          {
+            path: 'security',
+            element: (
+              <Lazy>
+                <SecuritySettings />
+              </Lazy>
+            ),
+          },
+          {
+            path: 'notifications',
+            element: (
+              <Lazy>
+                <NotificationSettings />
+              </Lazy>
+            ),
+          },
+        ],
+      },
+    ],
   },
 
   // ── 404 Catch-all ──────────────────────────────────────────────────────────

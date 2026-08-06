@@ -1,58 +1,111 @@
 @tailwind base;
+
+/* One global rule beats 400 stroke-width props — thinner strokes read as more
+   premium. `.lucide` is stamped on at runtime by lucide-react, so Tailwind's
+   content scanner never sees it; inside `@layer base` this rule gets purged as
+   an unused candidate. Declaring it here (unlayered, between base and
+   utilities) keeps it in the output while still letting a `stroke-2` utility
+   override it on the rare icon that needs weight. */
+svg.lucide {
+  stroke-width: 1.5;
+}
+
 @tailwind components;
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ElevateCRM — Global Design System
-   Using TailwindCSS v4 CSS-first configuration
-   Design inspiration: Linear + Vercel + Stripe
+   "Quiet confidence" — Linear / Attio / Vercel / Stripe level of restraint.
+
+   TOKEN CONTRACT
+   Every color is stored as bare HSL *channels* (`262 83% 58%`) so Tailwind can
+   compose alpha into it (`bg-primary/10`, `border-border/60`). A matching
+   `--color-*` alias wraps each in `hsl()` for use inside plain CSS.
+   Never hardcode a hex/rgb in a component — reach for a token.
    ───────────────────────────────────────────────────────────────────────────── */
 
-
-
-/* ── Theme Tokens (Light Mode) ─────────────────────────────────────────────── */
+/* ── Theme Tokens (Light) ──────────────────────────────────────────────────── */
 :root {
-  /* Colors — Semantic Tokens */
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(224 71.4% 4.1%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(224 71.4% 4.1%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(224 71.4% 4.1%);
-  --color-primary: hsl(262.1 83.3% 57.8%);
-  --color-primary-foreground: hsl(210 20% 98%);
-  --color-secondary: hsl(220 14.3% 95.9%);
-  --color-secondary-foreground: hsl(220.9 39.3% 11%);
-  --color-muted: hsl(220 14.3% 95.9%);
-  --color-muted-foreground: hsl(220 8.9% 46.1%);
-  --color-accent: hsl(220 14.3% 95.9%);
-  --color-accent-foreground: hsl(220.9 39.3% 11%);
-  --color-destructive: hsl(0 84.2% 60.2%);
-  --color-destructive-foreground: hsl(210 20% 98%);
-  --color-border: hsl(220 13% 91%);
-  --color-input: hsl(220 13% 91%);
-  --color-ring: hsl(262.1 83.3% 57.8%);
-  --color-success: hsl(142.1 76.2% 36.3%);
-  --color-success-foreground: hsl(355.7 100% 97.3%);
-  --color-warning: hsl(32.1 94.6% 43.7%);
-  --color-warning-foreground: hsl(210 20% 98%);
-  --color-info: hsl(221.2 83.2% 53.3%);
-  --color-info-foreground: hsl(210 20% 98%);
+  /* Surfaces & text */
+  --background: 0 0% 100%;
+  --foreground: 224 20% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 224 20% 9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 224 20% 9%;
 
-  /* Sidebar */
-  --color-sidebar: hsl(224 71.4% 4.1%);
-  --color-sidebar-foreground: hsl(210 20% 98%);
-  --color-sidebar-muted: hsl(215 20.2% 65.1%);
-  --color-sidebar-border: hsl(217.2 32.6% 17.5%);
-  --color-sidebar-accent: hsl(217.2 32.6% 17.5%);
-  --color-sidebar-accent-foreground: hsl(210 20% 98%);
-  --color-sidebar-primary: hsl(262.1 83.3% 57.8%);
-  --color-sidebar-primary-foreground: hsl(210 20% 98%);
+  /* Elevated surface — one step above --card, for nested panels / kanban wells */
+  --surface: 220 20% 98.5%;
+  --surface-foreground: 224 20% 9%;
 
-  /* Typography */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Brand accent — the single accent in the system */
+  --primary: 262 72% 55%;
+  --primary-foreground: 0 0% 100%;
+  --primary-subtle: 262 72% 96%;
 
-  /* Border Radius */
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 221 39% 11%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 43%;
+  --accent: 220 14% 96%;
+  --accent-foreground: 221 39% 11%;
+  --destructive: 347 70% 47%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 262 72% 55%;
+
+  /* Modal scrim. Must NOT be --foreground: that inverts per theme, so a dark
+     theme would get a bright white scrim over a dark app. */
+  --overlay: 224 24% 8%;
+
+  /* ── Status hues — deliberately desaturated (emerald-600 over green-500) ──
+     Each is used at /10 for fills, /20 for borders, full for dots + text.     */
+  --status-neutral: 220 9% 46%;
+  --status-info: 217 72% 51%;
+  --status-warn: 32 82% 44%;
+  --status-progress: 243 55% 58%;
+  --status-positive: 161 66% 33%;
+  --status-negative: 347 70% 47%;
+  --status-accent: 262 66% 55%;
+
+  /* ── Avatar identity ramp — hashed per person, muted so a table of eight
+     avatars reads as one palette rather than a bag of highlighters. ────────── */
+  --avatar-1: 217 55% 52%;
+  --avatar-2: 262 48% 58%;
+  --avatar-3: 329 45% 55%;
+  --avatar-4: 32 58% 47%;
+  --avatar-5: 161 45% 38%;
+  --avatar-6: 347 50% 55%;
+  --avatar-7: 190 52% 40%;
+  --avatar-8: 246 42% 56%;
+
+  /* Semantic aliases kept for existing call sites */
+  --success: var(--status-positive);
+  --success-foreground: 0 0% 100%;
+  --warning: var(--status-warn);
+  --warning-foreground: 0 0% 100%;
+  --info: var(--status-info);
+  --info-foreground: 0 0% 100%;
+
+  /* Sidebar — stays dark in both themes (Vercel/Linear rail) */
+  --sidebar: 224 22% 7%;
+  --sidebar-foreground: 210 20% 98%;
+  --sidebar-muted: 217 12% 55%;
+  --sidebar-border: 217 20% 16%;
+  --sidebar-accent: 217 22% 14%;
+  --sidebar-accent-foreground: 210 20% 98%;
+  --sidebar-primary: 262 78% 68%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-popover: 224 20% 13%;
+
+  /* ── Typography ──────────────────────────────────────────────────────────── */
+  --font-sans: 'Inter', 'Inter Variable', system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+
+  /* ── Radii ───────────────────────────────────────────────────────────────── */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;
@@ -60,87 +113,177 @@
   --radius-2xl: 1rem;
   --radius-full: 9999px;
 
-  /* Shadows */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-card: 0 0 0 1px rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.08);
+  /* ── Elevation — hairlines carry separation, shadows only lift on hover ──── */
+  --shadow-xs: 0 1px 2px 0 hsl(224 20% 9% / 0.04);
+  --shadow-sm: 0 1px 2px 0 hsl(224 20% 9% / 0.04),
+    0 1px 3px 0 hsl(224 20% 9% / 0.06);
+  --shadow-md: 0 2px 4px -1px hsl(224 20% 9% / 0.05),
+    0 6px 16px -4px hsl(224 20% 9% / 0.08);
+  --shadow-lg: 0 4px 8px -2px hsl(224 20% 9% / 0.06),
+    0 16px 32px -8px hsl(224 20% 9% / 0.12);
+  --shadow-card: 0 1px 2px 0 hsl(224 20% 9% / 0.03);
+  --shadow-pop: 0 4px 8px -2px hsl(224 20% 9% / 0.06),
+    0 16px 40px -12px hsl(224 20% 9% / 0.16);
 
-  /* Animations */
-  --animate-duration-fast: 150ms;
-  --animate-duration-normal: 250ms;
-  --animate-duration-slow: 400ms;
-  --animate-easing-default: cubic-bezier(0.4, 0, 0.2, 1);
-  --animate-easing-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* ── Motion — precise, never bouncy ──────────────────────────────────────── */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── hsl() aliases — for raw CSS that can't use Tailwind's alpha syntax ──── */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-surface: hsl(var(--surface));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-success: hsl(var(--success));
+  --color-warning: hsl(var(--warning));
+  --color-info: hsl(var(--info));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-muted: hsl(var(--sidebar-muted));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
 }
 
 /* ── Dark Mode ─────────────────────────────────────────────────────────────── */
 .dark {
-  --color-background: hsl(224 71.4% 4.1%);
-  --color-foreground: hsl(210 20% 98%);
-  --color-card: hsl(224 71.4% 6%);
-  --color-card-foreground: hsl(210 20% 98%);
-  --color-popover: hsl(224 71.4% 4.1%);
-  --color-popover-foreground: hsl(210 20% 98%);
-  --color-primary: hsl(263.4 70% 50.4%);
-  --color-primary-foreground: hsl(210 20% 98%);
-  --color-secondary: hsl(215 27.9% 16.9%);
-  --color-secondary-foreground: hsl(210 20% 98%);
-  --color-muted: hsl(215 27.9% 16.9%);
-  --color-muted-foreground: hsl(217.9 10.6% 64.9%);
-  --color-accent: hsl(215 27.9% 16.9%);
-  --color-accent-foreground: hsl(210 20% 98%);
-  --color-destructive: hsl(0 62.8% 30.6%);
-  --color-destructive-foreground: hsl(210 20% 98%);
-  --color-border: hsl(215 27.9% 16.9%);
-  --color-input: hsl(215 27.9% 16.9%);
-  --color-ring: hsl(263.4 70% 50.4%);
-  --color-success: hsl(142.1 70.6% 45.3%);
-  --color-warning: hsl(32.1 94.6% 53.7%);
-  --color-info: hsl(221.2 83.2% 63.3%);
+  --background: 224 24% 5%;
+  --foreground: 210 20% 96%;
+  --card: 224 22% 7.5%;
+  --card-foreground: 210 20% 96%;
+  --popover: 224 24% 8%;
+  --popover-foreground: 210 20% 96%;
+
+  --surface: 224 22% 9.5%;
+  --surface-foreground: 210 20% 96%;
+
+  --primary: 262 78% 66%;
+  --primary-foreground: 0 0% 100%;
+  --primary-subtle: 262 40% 16%;
+
+  --secondary: 217 20% 15%;
+  --secondary-foreground: 210 20% 96%;
+  --muted: 217 20% 15%;
+  --muted-foreground: 218 11% 62%;
+  --accent: 217 20% 15%;
+  --accent-foreground: 210 20% 96%;
+  --destructive: 350 68% 58%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 217 19% 17%;
+  --input: 217 19% 17%;
+  --ring: 262 78% 66%;
+
+  /* Goes fully black in dark mode — the app surface is already near-black, so
+     the scrim needs to sit below it to read as a scrim at all. */
+  --overlay: 0 0% 0%;
+
+  /* Tooltip surface for the always-dark rail — must clear the rail's own bg */
+  --sidebar-popover: 224 20% 15%;
+
+  /* Status hues lift in lightness so they stay legible on a dark ground */
+  --status-neutral: 218 11% 62%;
+  --status-info: 213 80% 66%;
+  --status-warn: 36 86% 60%;
+  --status-progress: 243 78% 72%;
+  --status-positive: 158 60% 50%;
+  --status-negative: 350 72% 63%;
+  --status-accent: 262 78% 72%;
+
+  /* Avatars lift and desaturate further so white initials stay high-contrast */
+  --avatar-1: 217 50% 58%;
+  --avatar-2: 262 46% 63%;
+  --avatar-3: 329 42% 60%;
+  --avatar-4: 32 52% 52%;
+  --avatar-5: 161 40% 44%;
+  --avatar-6: 347 46% 60%;
+  --avatar-7: 190 46% 45%;
+  --avatar-8: 246 40% 61%;
+
+  --sidebar: 224 24% 5.5%;
+  --sidebar-border: 217 19% 15%;
+  --sidebar-accent: 217 20% 13%;
+
+  --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
+  --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3), 0 1px 3px 0 hsl(0 0% 0% / 0.25);
+  --shadow-md: 0 2px 4px -1px hsl(0 0% 0% / 0.3),
+    0 6px 16px -4px hsl(0 0% 0% / 0.4);
+  --shadow-lg: 0 4px 8px -2px hsl(0 0% 0% / 0.35),
+    0 16px 32px -8px hsl(0 0% 0% / 0.5);
+  --shadow-card: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
+  --shadow-pop: 0 4px 8px -2px hsl(0 0% 0% / 0.35),
+    0 16px 40px -12px hsl(0 0% 0% / 0.6);
 }
 
-/* ── Base Styles ───────────────────────────────────────────────────────────── */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  border-color: var(--color-border);
-}
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    border-color: hsl(var(--border));
+  }
 
-html {
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  scroll-behavior: smooth;
-}
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
 
-body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-  font-size: 0.875rem;
-  line-height: 1.5;
-  min-height: 100vh;
-}
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-size: 0.875rem;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
 
-/* ── Focus Ring ────────────────────────────────────────────────────────────── */
-:focus-visible {
-  outline: 2px solid var(--color-ring);
-  outline-offset: 2px;
-}
+  /* Headings lead with tighter tracking rather than bigger type */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
 
-/* ── Selection ─────────────────────────────────────────────────────────────── */
-::selection {
-  background-color: hsl(from var(--color-primary) h s l / 0.2);
-  color: var(--color-foreground);
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.22);
+    color: hsl(var(--foreground));
+  }
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -148,55 +291,206 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--color-border);
+  background-color: hsl(var(--foreground) / 0.14);
   border-radius: var(--radius-full);
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-muted-foreground);
+  background-color: hsl(var(--foreground) / 0.26);
 }
 
-/* ── Utility Classes ───────────────────────────────────────────────────────── */
-.auth-bg {
-  background: radial-gradient(
-      ellipse 80% 80% at 50% -20%,
-      hsl(from var(--color-primary) h s l / 0.15),
-      transparent
-    ),
-    var(--color-background);
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
-.card-glass {
-  background: hsl(from var(--color-card) h s l / 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+/* ── Component utilities ───────────────────────────────────────────────────── */
+@layer components {
+  /* Hairline-bounded card. Shadows are reserved for hover / overlay. */
+  .surface-card {
+    @apply rounded-xl border border-border/60 bg-card;
+  }
+
+  /* The one accent gradient — hero metrics and featured surfaces only. */
+  .accent-gradient {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--primary)) 0%,
+      hsl(var(--status-progress)) 100%
+    );
+  }
+
+  .accent-gradient-text {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--primary)) 0%,
+      hsl(var(--status-progress)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Monochrome base + a soft radial bloom. Premium without shouting. */
+  .accent-glow {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .accent-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: radial-gradient(
+        120% 100% at 12% 0%,
+        hsl(var(--primary) / 0.16) 0%,
+        transparent 62%
+      ),
+      radial-gradient(
+        90% 80% at 100% 100%,
+        hsl(var(--status-progress) / 0.12) 0%,
+        transparent 60%
+      );
+    pointer-events: none;
+  }
+
+  /* Slow-drifting conic border. Reserved for the AI Insights card. */
+  .aurora-border {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .aurora-border::before {
+    content: '';
+    position: absolute;
+    /* inset:0, not -1px — the host card clips with overflow-hidden, and a
+       negative inset would put the whole ring outside the clip region. */
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--aurora-angle, 0deg),
+      hsl(var(--primary) / 0.55),
+      hsl(var(--status-progress) / 0.45),
+      hsl(var(--primary) / 0.1),
+      hsl(var(--status-accent) / 0.5),
+      hsl(var(--primary) / 0.55)
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: aurora-spin 8s linear infinite;
+  }
+
+  .auth-bg {
+    background: radial-gradient(
+        ellipse 80% 80% at 50% -20%,
+        hsl(var(--primary) / 0.14),
+        transparent
+      ),
+      hsl(var(--background));
+  }
+
+  .card-glass {
+    background: hsl(var(--card) / 0.72);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+  }
+
+  /* Keyboard-shortcut chip — ⌘K affordances */
+  .kbd {
+    @apply inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded
+      border border-border/70 bg-muted/60 px-1.5 font-sans text-[10px]
+      font-medium leading-none text-muted-foreground;
+  }
+
+  .input-base {
+    height: 2.75rem;
+    width: 100%;
+    border-radius: var(--radius-lg);
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--background));
+    padding-inline: 0.75rem;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+    transition: border-color var(--duration-fast) var(--ease-default),
+      box-shadow var(--duration-fast) var(--ease-default);
+    outline: none;
+  }
+
+  .input-base::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .input-base:focus {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+  }
+
+  .input-base.error {
+    border-color: hsl(var(--destructive));
+    box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.12);
+  }
 }
 
-.input-base {
-  height: 2.75rem;
-  width: 100%;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-background);
-  padding-inline: 0.75rem;
-  font-size: 0.875rem;
-  color: var(--color-foreground);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-  outline: none;
+/* ── Utilities ─────────────────────────────────────────────────────────────── */
+@layer utilities {
+  /* `tabular-nums` itself is a Tailwind built-in — use it on every metric so
+     digits never jitter as values update. */
+
+  /* Reveal-on-hover row actions (Notion pattern) */
+  .row-actions {
+    @apply opacity-0 transition-opacity duration-150;
+  }
+
+  .group:hover .row-actions,
+  .group:focus-within .row-actions {
+    @apply opacity-100;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
-.input-base::placeholder {
-  color: var(--color-muted-foreground);
+/* ── Keyframes ─────────────────────────────────────────────────────────────── */
+@property --aurora-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
 }
 
-.input-base:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px hsl(from var(--color-primary) h s l / 0.15);
+@keyframes aurora-spin {
+  to {
+    --aurora-angle: 360deg;
+  }
 }
 
-.input-base.error {
-  border-color: var(--color-destructive);
-  box-shadow: 0 0 0 3px hsl(from var(--color-destructive) h s l / 0.1);
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

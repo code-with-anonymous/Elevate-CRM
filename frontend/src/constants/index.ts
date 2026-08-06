@@ -32,6 +32,9 @@ export const ROUTES = {
   DEALS: '/deals',
   TASKS: '/tasks',
   CALENDAR: '/calendar',
+  ACTIVITY: '/activity',
+  // Kept for the legacy /dashboard/teams route. The real team management page is
+  // ROUTES.SETTINGS.TEAM — the sidebar points there now.
   TEAMS: '/dashboard/teams',
   REPORTS: '/reports',
 } as const;

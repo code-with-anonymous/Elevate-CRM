@@ -1,95 +1,131 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// src/components/dashboard/RevenueGoalCard.tsx
+// Closed-won total over an area trend. The chart is chrome behind the figure,
+// not the subject — so it sits at low opacity and runs to the card edges.
+// ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import { useStats, useRevenueTrend } from '@/hooks/useDashboard';
-import { Skeleton } from '@/components/ui/skeleton';
-import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis } from 'recharts';
-import { ArrowUpRight, Plus, CheckSquare } from 'lucide-react';
+import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import { ArrowUpRight, CheckSquare, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useRevenueTrend, useStats } from '@/hooks/useDashboard';
+import { ROUTES } from '@/constants';
+import { formatCurrency } from '@/lib/format';
+import { chartColor } from '@/lib/chartTheme';
 import AddLeadDrawer from '@/components/leads/AddLeadDrawer';
-
 import CardErrorState from '@/components/dashboard/CardErrorState';
+import {
+  DashCard,
+  DashCardSkeleton,
+  MetricLabel,
+} from '@/components/dashboard/DashCard';
 
 export default function RevenueGoalCard() {
-  const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useStats();
-  const { data: revenueData, isLoading: chartLoading, refetch: refetchRevenue } = useRevenueTrend();
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+    refetch: refetchStats,
+  } = useStats();
+  const {
+    data: revenueData,
+    isLoading: chartLoading,
+    refetch: refetchRevenue,
+  } = useRevenueTrend();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isLoading = statsLoading || chartLoading;
 
-  const trendArray = Array.isArray(revenueData)
-    ? revenueData
-    : (revenueData?.trend || []);
+  const trendArray = Array.isArray(revenueData) ? revenueData : revenueData?.trend || [];
 
-  const chartData = trendArray.map((d: any) => ({ 
-    name: d.label || d.name, 
-    value: d.value 
+  const chartData = trendArray.map((d: any) => ({
+    name: d.label || d.name,
+    value: d.value,
   }));
   const totalWon = revenueData?.totalWon ?? stats?.weeklyRevenue?.amount ?? 0;
 
   if (isLoading) {
-    return <Skeleton className="h-48 rounded-xl border border-border" />;
+    return <DashCardSkeleton className="h-48" lines={1} showChart />;
   }
 
   if (statsError) {
-    return <CardErrorState onRetry={() => { refetchStats(); refetchRevenue(); }} heightClass="h-48" />;
+    return (
+      <CardErrorState
+        onRetry={() => {
+          refetchStats();
+          refetchRevenue();
+        }}
+        heightClass="h-48"
+      />
+    );
   }
 
   return (
-    <div className="flex h-48 flex-col justify-between rounded-xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
-      <div className="flex items-start justify-between">
+    <DashCard interactive className="h-48 justify-between p-6">
+      <div className="relative z-10 flex items-start justify-between">
         <div>
-          <h3 className="text-sm font-medium text-foreground">Revenue Goal</h3>
+          <h3 className="text-[13px] font-semibold tracking-tight text-foreground">
+            Revenue Goal
+          </h3>
           <p className="text-xs text-muted-foreground">Closed-won total</p>
         </div>
-        <button className="text-muted-foreground transition-colors hover:text-foreground">
-          <ArrowUpRight size={16} />
-        </button>
-      </div>
-
-      <div className="relative mt-2 flex-1">
-        <div className="absolute top-0 z-10 pointer-events-none">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Won</p>
-          <div className="text-2xl font-bold tracking-tight text-foreground">
-            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(totalWon)}
-          </div>
-        </div>
-
-        <div className="absolute inset-x-0 bottom-0 top-0 opacity-60 pointer-events-none">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--color-primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--color-primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <YAxis domain={['dataMin - 10000', 'dataMax + 10000']} hide />
-              <XAxis dataKey="name" hide />
-              <Area 
-                type="monotone" 
-                dataKey="value" 
-                stroke="hsl(var(--color-primary))" 
-                strokeWidth={2}
-                fillOpacity={1} 
-                fill="url(#colorRevenue)" 
-                isAnimationActive={true}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="mt-3 flex gap-2">
-        <button 
-          onClick={() => setDrawerOpen(true)}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-background py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+        <Link
+          to={ROUTES.LEADS}
+          aria-label="View leads"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
         >
-          <Plus size={14} /> Add Lead
+          <ArrowUpRight size={15} />
+        </Link>
+      </div>
+
+      <div className="relative z-10 mt-2">
+        <MetricLabel>Total won</MetricLabel>
+        <p className="mt-0.5 text-[28px] font-semibold leading-none tracking-tighter tabular-nums text-foreground">
+          {formatCurrency(totalWon)}
+        </p>
+      </div>
+
+      {/* Trend runs edge-to-edge behind the figure and the buttons */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-[52px] top-16 opacity-70">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="revenueGoalFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={chartColor.primary} stopOpacity={0.28} />
+                <stop offset="100%" stopColor={chartColor.primary} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <YAxis domain={['dataMin - 10000', 'dataMax + 10000']} hide />
+            <XAxis dataKey="name" hide />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke={chartColor.primary}
+              strokeWidth={1.75}
+              fillOpacity={1}
+              fill="url(#revenueGoalFill)"
+              isAnimationActive
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="relative z-10 mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card/80 py-1.5 text-xs font-medium text-foreground backdrop-blur-sm transition-colors duration-150 hover:border-border hover:bg-muted"
+        >
+          <Plus size={13} /> Add Lead
         </button>
-        <button className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-background py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
-          <CheckSquare size={14} /> Task
-        </button>
+        <Link
+          to={ROUTES.TASKS}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card/80 py-1.5 text-xs font-medium text-foreground backdrop-blur-sm transition-colors duration-150 hover:border-border hover:bg-muted"
+        >
+          <CheckSquare size={13} /> Task
+        </Link>
       </div>
 
       <AddLeadDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
-    </div>
+    </DashCard>
   );
 }
