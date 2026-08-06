@@ -12,18 +12,34 @@ import {
   MOCK_REVENUE_CHART 
 } from '@/constants/dashboardMockData';
 
-// Vite handles import.meta.env
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+export interface DateRange {
+  from?: string;
+  to?: string;
+}
+
+function buildQuery(dateRange?: DateRange, extra?: Record<string, string>): string {
+  const params = new URLSearchParams();
+  if (dateRange?.from) params.set('from', dateRange.from);
+  if (dateRange?.to) params.set('to', dateRange.to);
+  if (extra) {
+    Object.entries(extra).forEach(([k, v]) => params.set(k, v));
+  }
+  const str = params.toString();
+  return str ? `?${str}` : '';
+}
+
 export const dashboardService = {
-  getStats: async () => {
+  getStats: async (dateRange?: DateRange) => {
     if (USE_MOCK) {
       await delay(500);
       return MOCK_DASHBOARD_STATS;
     }
-    const res = await axiosInstance.get('/dashboard/stats');
+    const query = buildQuery(dateRange);
+    const res = await axiosInstance.get(`/dashboard/stats${query}`);
     return res.data.data;
   },
   
@@ -36,13 +52,14 @@ export const dashboardService = {
     return res.data.data;
   },
   
-  getPipelineChart: async (period: 'monthly' | 'annually') => {
+  getPipelineChart: async (period: 'monthly' | 'annually', dateRange?: DateRange) => {
     if (USE_MOCK) {
       await delay(500);
       // @ts-ignore
       return MOCK_PIPELINE_CHART[period];
     }
-    const res = await axiosInstance.get(`/dashboard/pipeline-chart?period=${period}`);
+    const query = buildQuery(dateRange, { period });
+    const res = await axiosInstance.get(`/dashboard/pipeline-chart${query}`);
     return res.data.data;
   },
 
@@ -55,21 +72,23 @@ export const dashboardService = {
     return res.data.data;
   },
 
-  getLeadsBySource: async () => {
+  getLeadsBySource: async (dateRange?: DateRange) => {
     if (USE_MOCK) {
       await delay(500);
       return MOCK_LEADS_BY_SOURCE;
     }
-    const res = await axiosInstance.get('/dashboard/leads-by-source');
+    const query = buildQuery(dateRange);
+    const res = await axiosInstance.get(`/dashboard/leads-by-source${query}`);
     return res.data.data;
   },
   
-  getRevenueTrend: async () => {
+  getRevenueTrend: async (dateRange?: DateRange) => {
     if (USE_MOCK) {
       await delay(500);
       return MOCK_REVENUE_CHART;
     }
-    const res = await axiosInstance.get('/dashboard/revenue-trend');
+    const query = buildQuery(dateRange);
+    const res = await axiosInstance.get(`/dashboard/revenue-trend${query}`);
     return res.data.data;
   },
 

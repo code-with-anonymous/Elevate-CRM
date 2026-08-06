@@ -1,15 +1,17 @@
 import { useStats } from '@/hooks/useDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import CardErrorState from '@/components/dashboard/CardErrorState';
+
 export default function ConversionCard() {
-  const { data, isLoading, isError } = useStats();
+  const { data, isLoading, isError, refetch } = useStats();
 
   if (isLoading) {
     return <Skeleton className="h-32 rounded-xl border border-border" />;
   }
 
   if (isError) {
-    return <div className="h-32 rounded-xl border border-border bg-card p-6 text-destructive flex items-center justify-center">Error loading data</div>;
+    return <CardErrorState onRetry={() => refetch()} heightClass="h-32" />;
   }
 
   return (

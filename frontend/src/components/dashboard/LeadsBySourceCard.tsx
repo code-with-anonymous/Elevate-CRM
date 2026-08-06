@@ -2,15 +2,17 @@ import { useLeadsBySource } from '@/hooks/useDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
+import CardErrorState from '@/components/dashboard/CardErrorState';
+
 export default function LeadsBySourceCard() {
-  const { data, isLoading, isError } = useLeadsBySource();
+  const { data, isLoading, isError, refetch } = useLeadsBySource();
 
   if (isLoading) {
     return <Skeleton className="min-h-[250px] w-full rounded-xl border border-border" />;
   }
 
   if (isError) {
-    return <div className="min-h-[250px] w-full rounded-xl border border-border bg-card p-6 text-destructive flex items-center justify-center">Error loading data</div>;
+    return <CardErrorState onRetry={() => refetch()} heightClass="min-h-[250px]" />;
   }
 
   // Pre-defined colors for standard sources

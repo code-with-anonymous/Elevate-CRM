@@ -2,7 +2,7 @@
 // src/components/layout/TopNavbar.tsx
 // Horizontal top navbar — tabs, search, notifications, avatar, CTA
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -14,10 +14,14 @@ import {
   Settings,
   User,
   X,
+  Calendar as CalendarIcon,
+  Check,
 } from 'lucide-react';
 import { ROUTES } from '@/constants';
 import { useAuthStore } from '@/store/authStore';
 import { useLogout } from '@/hooks/useAuthActions';
+import { useNotificationStore } from '@/store/notificationStore';
+import { useDashboardStore } from '@/store/dashboardStore';
 import AddLeadDrawer from '@/components/leads/AddLeadDrawer';
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
@@ -30,22 +34,158 @@ interface NavTab {
 const TABS: NavTab[] = [
   { label: 'Dashboard', path: ROUTES.DASHBOARD },
   { label: 'Leads', path: ROUTES.LEADS },
-  { label: 'Pipeline', path: ROUTES.DEALS },
+  { label: 'Pipeline', path: '/pipeline' },
   { label: 'Contacts', path: ROUTES.CONTACTS },
   { label: 'Tasks', path: ROUTES.TASKS },
 ];
 
-// ── Date formatter ────────────────────────────────────────────────────────────
+// ── Date range selector component ─────────────────────────────────────────────
 
-function getDateRange(): string {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 1);
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-  return `${formatter.format(start)} – ${formatter.format(now)}`;
+function DateRangeSelector() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { setDateRange } = useDashboardStore();
+  const [selectedLabel, setSelectedLabel] = useState('All Time');
+
+  const options = [
+    { label: 'All Time', from: '', to: '' },
+    { label: 'Last 30 Days', from: new Date(Date.now() - 30 * 86400000).toISOString(), to: new Date().toISOString() },
+    { label: 'This Quarter', from: new Date(new Date().getFullYear(), Math.floor(new Date().getMonth() / 3) * 3, 1).toISOString(), to: new Date().toISOString() },
+    { label: 'This Year', from: new Date(new Date().getFullYear(), 0, 1).toISOString(), to: new Date().toISOString() },
+  ];
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative hidden lg:block">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <CalendarIcon size={14} />
+        <span>{selectedLabel}</span>
+        <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-2 z-50 w-44 rounded-xl border border-border bg-card p-1.5 shadow-lg"
+          >
+            {options.map((opt) => (
+              <button
+                key={opt.label}
+                onClick={() => {
+                  setSelectedLabel(opt.label);
+                  setDateRange({ from: opt.from, to: opt.to });
+                  setOpen(false);
+                }}
+                className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs text-foreground hover:bg-muted"
+              >
+                <span>{opt.label}</span>
+                {selectedLabel === opt.label && <Check size={14} className="text-blue-500" />}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Notification Popover ──────────────────────────────────────────────────────
+
+function NotificationPopover() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { notifications, unreadCount, markAllAsRead } = useNotificationStore();
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="relative flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        aria-label="Notifications"
+      >
+        <Bell size={16} />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white ring-2 ring-card">
+            {unreadCount}
+          </span>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-2 z-50 w-80 rounded-xl border border-border bg-card p-3 shadow-lg"
+          >
+            <div className="flex items-center justify-between border-b border-border pb-2.5 mb-2">
+              <h4 className="text-xs font-semibold text-foreground">Notifications</h4>
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllAsRead}
+                  className="text-[11px] font-medium text-blue-500 hover:underline"
+                >
+                  Mark all as read
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {notifications.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex items-start gap-2.5 rounded-lg p-2 transition-colors ${
+                    item.read ? 'bg-transparent' : 'bg-muted/50'
+                  }`}
+                >
+                  <div
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white mt-0.5"
+                    style={{ backgroundColor: item.avatarColor || '#3B82F6' }}
+                  >
+                    {item.initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground leading-snug">{item.title}</p>
+                    <span className="text-[10px] text-muted-foreground">{item.timeAgo}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 // ── Avatar dropdown ───────────────────────────────────────────────────────────
@@ -61,7 +201,6 @@ function AvatarDropdown() {
     ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
     : 'U';
 
-  // Close on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -98,7 +237,6 @@ function AvatarDropdown() {
             transition={{ duration: 0.15 }}
             className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-border bg-card p-1.5 shadow-lg"
           >
-            {/* User info */}
             <div className="border-b border-border px-3 py-2.5 mb-1">
               <p className="text-sm font-semibold text-foreground">
                 {user?.firstName} {user?.lastName}
@@ -163,7 +301,6 @@ export default function TopNavbar() {
     }
   }, [searchOpen]);
 
-  // Keyboard shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -212,10 +349,8 @@ export default function TopNavbar() {
 
       {/* Right: actions */}
       <div className="flex items-center gap-2">
-        {/* Date range */}
-        <span className="hidden lg:block mr-2 text-xs text-muted-foreground font-medium">
-          {getDateRange()}
-        </span>
+        {/* Date range selector */}
+        <DateRangeSelector />
 
         {/* Search */}
         <AnimatePresence>
@@ -248,16 +383,7 @@ export default function TopNavbar() {
         </button>
 
         {/* Notifications */}
-        <button
-          type="button"
-          className="relative flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label="Notifications"
-        >
-          <Bell size={16} />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white ring-2 ring-card">
-            3
-          </span>
-        </button>
+        <NotificationPopover />
 
         {/* Add Lead CTA */}
         <button

@@ -14,7 +14,6 @@ import {
   Calendar,
   BarChart3,
   Settings,
-  LogOut,
   Zap,
   UsersRound,
 } from 'lucide-react';
@@ -34,7 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: ROUTES.DASHBOARD },
   { label: 'Contacts', icon: <UserCircle size={20} />, path: ROUTES.CONTACTS },
   { label: 'Leads', icon: <Users size={20} />, path: ROUTES.LEADS },
-  { label: 'Pipeline', icon: <GitBranch size={20} />, path: ROUTES.DEALS },
+  { label: 'Pipeline', icon: <GitBranch size={20} />, path: '/pipeline' },
   { label: 'Tasks', icon: <CheckSquare size={20} />, path: ROUTES.TASKS },
   { label: 'Calendar', icon: <Calendar size={20} />, path: ROUTES.CALENDAR },
   { label: 'Teams', icon: <UsersRound size={20} />, path: ROUTES.TEAMS },

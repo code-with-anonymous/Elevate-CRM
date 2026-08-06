@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { ROUTES } from '@/constants';
 import { useFollowUps } from '@/hooks/useDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar, Phone, FileText } from 'lucide-react';
@@ -16,8 +18,10 @@ function formatDueDate(raw: string | null) {
   return d.format('DD MMM');
 }
 
+import CardErrorState from '@/components/dashboard/CardErrorState';
+
 export default function FollowUpsCard() {
-  const { data, isLoading, isError } = useFollowUps();
+  const { data, isLoading, isError, refetch } = useFollowUps();
   const followUps = Array.isArray(data) ? data : (data?.followUps || []);
 
   if (isLoading) {
@@ -25,7 +29,7 @@ export default function FollowUpsCard() {
   }
 
   if (isError) {
-    return <div className="h-64 rounded-xl border border-border bg-card p-6 text-destructive flex items-center justify-center">Error loading data</div>;
+    return <CardErrorState onRetry={() => refetch()} heightClass="h-64" />;
   }
 
   return (
@@ -69,9 +73,9 @@ export default function FollowUpsCard() {
         </div>
         
         <div className="mt-4 flex justify-end">
-          <button className="text-xs font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
+          <Link to={`${ROUTES.TASKS}?filter=upcoming`} className="text-xs font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
             View all
-          </button>
+          </Link>
         </div>
       </div>
     </div>

@@ -1,5 +1,4 @@
 import { useAIInsights } from '@/hooks/useDashboard';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkles, CheckCircle2, AlertTriangle, Info, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 

@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { usePipelineChart } from '@/hooks/useDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+
+import CardErrorState from '@/components/dashboard/CardErrorState';
 
 export default function PipelineEngagementChart() {
   const [period, setPeriod] = useState<'monthly' | 'annually'>('monthly');
-  const { data: chartResponse, isLoading, isError } = usePipelineChart(period);
+  const { data: chartResponse, isLoading, isError, refetch } = usePipelineChart(period);
 
   const dataArray = Array.isArray(chartResponse)
     ? chartResponse
@@ -46,7 +48,7 @@ export default function PipelineEngagementChart() {
         {isLoading ? (
           <Skeleton className="h-full w-full" />
         ) : isError ? (
-          <div className="h-full w-full flex items-center justify-center text-destructive">Error loading chart</div>
+          <CardErrorState onRetry={() => refetch()} heightClass="h-full" />
         ) : (
           <>
             {/* Peak growth badge */}

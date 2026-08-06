@@ -2,7 +2,6 @@
 // App.tsx — Root application shell
 // Providers are layered here in the correct order
 // ─────────────────────────────────────────────────────────────────────────────
-import { Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from 'react-hot-toast';

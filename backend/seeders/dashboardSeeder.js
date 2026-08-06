@@ -29,7 +29,8 @@ const getMonthDate = (monthIndex, day = rand(1, 28)) => {
 
 const runSeeder = async () => {
   try {
-    await mongoose.connect(env.MONGODB_URI);
+    // await mongoose.connect(env.MONGODB_URI);
+    await mongoose.connect("mongodb+srv://crm_elevate:crm_elevate_2026@cluster0.mmfztfs.mongodb.net/?retryWrites=true&w=majority")
     console.log('📦 Connected to MongoDB');
 
     // Get any org

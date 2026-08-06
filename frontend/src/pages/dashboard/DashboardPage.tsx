@@ -2,7 +2,6 @@
 // src/pages/dashboard/DashboardPage.tsx
 // Main dashboard page with 3-column responsive grid layout
 // ─────────────────────────────────────────────────────────────────────────────
-import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import WelcomeHeader from '@/components/dashboard/WelcomeHeader';

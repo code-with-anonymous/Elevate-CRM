@@ -30,7 +30,7 @@ export default function AddLeadDrawer({ isOpen, onClose }: AddLeadDrawerProps) {
   const queryClient = useQueryClient();
 
   // Fetch users for the assignee dropdown
-  const { data: users = [], isLoading: loadingUsers } = useQuery({
+  const { data: users = [] } = useQuery({
     queryKey: ['org-users'],
     queryFn: () => leadsService.getOrgUsers(),
     enabled: isOpen,
@@ -104,7 +104,7 @@ export default function AddLeadDrawer({ isOpen, onClose }: AddLeadDrawerProps) {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed bottom-0 right-0 top-0 z-50 w-full max-w-md border-l border-border bg-card shadow-2xl flex flex-col h-full"
+            className="fixed bottom-0 right-0 top-0 z-50 w-full max-w-md border-l border-border bg-card shadow-2xl flex flex-col h-screen"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border p-5">

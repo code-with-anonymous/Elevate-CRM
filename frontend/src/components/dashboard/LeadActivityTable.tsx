@@ -1,9 +1,14 @@
+import { Link, useNavigate } from 'react-router-dom';
+import { ROUTES } from '@/constants';
 import { ArrowUpRight } from 'lucide-react';
 import { useLeadActivity } from '@/hooks/useDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import CardErrorState from '@/components/dashboard/CardErrorState';
+
 export default function LeadActivityTable() {
-  const { data, isLoading, isError } = useLeadActivity();
+  const navigate = useNavigate();
+  const { data, isLoading, isError, refetch } = useLeadActivity();
   const activities = Array.isArray(data) ? data : (data?.activities || []);
 
   return (
@@ -13,9 +18,9 @@ export default function LeadActivityTable() {
           <h3 className="text-base font-semibold text-foreground">Lead Activity</h3>
           <p className="text-xs text-muted-foreground">Recent lead movements</p>
         </div>
-        <button className="text-muted-foreground transition-colors hover:text-foreground">
+        <Link to={ROUTES.LEADS} className="text-muted-foreground transition-colors hover:text-foreground">
           <ArrowUpRight size={16} />
-        </button>
+        </Link>
       </div>
 
       <div className="flex-1 overflow-x-auto">
@@ -24,7 +29,7 @@ export default function LeadActivityTable() {
             {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
           </div>
         ) : isError ? (
-          <div className="text-destructive py-4 text-center">Error loading table</div>
+          <CardErrorState onRetry={() => refetch()} heightClass="min-h-[200px]" />
         ) : (
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="text-xs text-muted-foreground border-b border-border">
@@ -46,7 +51,11 @@ export default function LeadActivityTable() {
                 if (row.status === 'Lost') dotClass = 'bg-red-500';
 
                 return (
-                  <tr key={row.id} className="transition-colors hover:bg-muted/50">
+                  <tr
+                    key={row.id}
+                    className="transition-colors hover:bg-muted/50 cursor-pointer"
+                    onClick={() => navigate(`${ROUTES.LEADS}/${row.id}`)}
+                  >
                     <td className="py-3">
                       <div className="flex items-center gap-3">
                         <div
@@ -82,9 +91,9 @@ export default function LeadActivityTable() {
 
       {!isLoading && !isError && (
         <div className="mt-4 flex justify-end">
-          <button className="text-xs font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
+          <Link to={ROUTES.LEADS} className="text-xs font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
             View all leads
-          </button>
+          </Link>
         </div>
       )}
     </div>

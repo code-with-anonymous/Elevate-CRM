@@ -76,6 +76,18 @@ const leadSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    activityLog: [
+      {
+        status: { type: String },
+        changedAt: { type: Date, default: Date.now },
+        note: { type: String, default: null },
+      },
+    ],
   },
   { timestamps: true }
 );

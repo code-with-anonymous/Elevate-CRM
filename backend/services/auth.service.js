@@ -689,15 +689,20 @@ async function disable2FA(userId, code) {
 // ── Invite Member ─────────────────────────────────────────────────────────────
 
 async function inviteMember(organizationId, invitedBy, email, role, inviterName, orgName) {
+  console.log('\n========== INVITE MEMBER DEBUG ==========');
+  console.log('1. Checking if user exists...');
+  
   // Check if already a member
   const existingUser = await User.findOne({
     email:          email.toLowerCase(),
     organizationId,
   });
   if (existingUser) {
+    console.log('❌ FAILED: User already exists.');
     throw ApiError.conflict('This email is already a member of your organisation', 'ALREADY_MEMBER');
   }
 
+  console.log('2. Checking for pending invitations...');
   // Check for pending invitation
   const existingInvite = await Invitation.findOne({
     email:          email.toLowerCase(),
@@ -706,13 +711,16 @@ async function inviteMember(organizationId, invitedBy, email, role, inviterName,
     expiresAt:      { $gt: new Date() },
   });
   if (existingInvite) {
+    console.log('❌ FAILED: Pending invite already exists.');
     throw ApiError.conflict('An invitation for this email is already pending', 'INVITE_PENDING');
   }
 
+  console.log('3. Generating token...');
   const rawToken = tokenService.generateRandomToken();
   const hashed   = tokenService.hashToken(rawToken);
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+  console.log('4. Saving invitation to database...');
   await Invitation.create({
     organizationId,
     invitedBy,
@@ -721,8 +729,24 @@ async function inviteMember(organizationId, invitedBy, email, role, inviterName,
     token:    hashed,
     expiresAt,
   });
+  console.log('✅ Invitation saved to DB successfully.');
 
-  await emailService.sendInvitationEmail(email, inviterName, orgName, rawToken);
+  console.log('5. Preparing to send email...');
+  console.log('   To:', email);
+  console.log('   From:', env.EMAIL_FROM);
+  
+  try {
+    await emailService.sendInvitationEmail(email, inviterName, orgName, rawToken);
+    console.log('✅ Email function completed without throwing errors.');
+  } catch (error) {
+    console.error('❌ EMAIL ERROR CAUGHT IN INVITE MEMBER:');
+    console.error('   Message:', error.message);
+    console.error('   Code:', error.code);
+    console.error('   Full Error:', error);
+    // Intentionally not throwing so the 201 still returns, but we see the error
+  }
+
+  console.log('=========================================\n');
 }
 
 // ── Get Invite Details ────────────────────────────────────────────────────────

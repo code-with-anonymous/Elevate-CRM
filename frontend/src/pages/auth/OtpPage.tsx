@@ -18,7 +18,7 @@ export default function OtpPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   
   const navigate = useNavigate();
-  const { otpDestination, isAuthenticated } = useAuth();
+  const { otpDestination } = useAuth();
   
   // Actually, we could extract context from route state, assuming default for now
   const context = OtpContext.PHONE_VERIFICATION;

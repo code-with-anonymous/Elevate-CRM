@@ -5,9 +5,11 @@ import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis } from 'recharts';
 import { ArrowUpRight, Plus, CheckSquare } from 'lucide-react';
 import AddLeadDrawer from '@/components/leads/AddLeadDrawer';
 
+import CardErrorState from '@/components/dashboard/CardErrorState';
+
 export default function RevenueGoalCard() {
-  const { data: stats, isLoading: statsLoading, isError: statsError } = useStats();
-  const { data: revenueData, isLoading: chartLoading } = useRevenueTrend();
+  const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useStats();
+  const { data: revenueData, isLoading: chartLoading, refetch: refetchRevenue } = useRevenueTrend();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isLoading = statsLoading || chartLoading;
@@ -27,7 +29,7 @@ export default function RevenueGoalCard() {
   }
 
   if (statsError) {
-    return <div className="h-48 rounded-xl border border-border bg-card p-6 text-destructive flex items-center justify-center">Error loading data</div>;
+    return <CardErrorState onRetry={() => { refetchStats(); refetchRevenue(); }} heightClass="h-48" />;
   }
 
   return (

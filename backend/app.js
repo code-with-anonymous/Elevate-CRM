@@ -19,6 +19,9 @@ const errorHandler   = require('./middleware/errorHandler');
 const authRoutes      = require('./routes/auth.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const leadsRoutes     = require('./routes/leads.routes');
+const dealsRoutes     = require('./routes/deals.routes');
+const contactsRoutes  = require('./routes/contacts.routes');
+const tasksRoutes     = require('./routes/tasks.routes');
 
 const app = express();
 
@@ -63,7 +66,10 @@ app.get('/health', (req, res) => {
 // ── API Routes ─────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/leads', leadsRoutes);
+app.use('/api/leads',    leadsRoutes);
+app.use('/api/deals',    dealsRoutes);
+app.use('/api/contacts', contactsRoutes);
+app.use('/api/tasks',    tasksRoutes);
 
 // ── 404 handler ────────────────────────────────────────────────────────────────
 app.use((req, res) => {

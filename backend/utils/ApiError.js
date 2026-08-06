@@ -12,9 +12,14 @@ class ApiError extends Error {
    * @param {boolean}  [isOperational]  false = programming error → 500
    */
   constructor(statusCode, message, code = 'ERROR', errors = [], isOperational = true) {
-    super(message);
+    if (typeof statusCode === 'string' && typeof message === 'number') {
+      const temp = statusCode;
+      statusCode = message;
+      message = temp;
+    }
+    super(typeof message === 'string' ? message : 'An error occurred');
     this.name          = 'ApiError';
-    this.statusCode    = statusCode;
+    this.statusCode    = typeof statusCode === 'number' ? statusCode : 500;
     this.code          = code;
     this.errors        = errors;
     this.isOperational = isOperational;

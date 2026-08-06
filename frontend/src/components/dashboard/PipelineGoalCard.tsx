@@ -3,15 +3,17 @@ import { motion } from 'framer-motion';
 import { useStats } from '@/hooks/useDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import CardErrorState from '@/components/dashboard/CardErrorState';
+
 export default function PipelineGoalCard() {
-  const { data, isLoading, isError } = useStats();
+  const { data, isLoading, isError, refetch } = useStats();
 
   if (isLoading) {
     return <Skeleton className="h-48 rounded-xl border border-border" />;
   }
 
   if (isError) {
-    return <div className="h-48 rounded-xl border border-border bg-card p-6 text-destructive flex items-center justify-center">Error loading data</div>;
+    return <CardErrorState onRetry={() => refetch()} heightClass="h-48" />;
   }
 
   return (

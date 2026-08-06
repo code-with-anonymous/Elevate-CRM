@@ -41,6 +41,7 @@ function getAuthStore(): {
       useAuthStore: {
         getState: () => {
           accessToken: string | null;
+          setAuth: (user: never, token: string, org: never, expiresIn?: number) => void;
           clearAuth: () => void;
         };
       };

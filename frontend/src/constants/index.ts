@@ -32,7 +32,7 @@ export const ROUTES = {
   DEALS: '/deals',
   TASKS: '/tasks',
   CALENDAR: '/calendar',
-  TEAMS: '/teams',
+  TEAMS: '/dashboard/teams',
   REPORTS: '/reports',
 } as const;
 

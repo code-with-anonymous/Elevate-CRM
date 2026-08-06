@@ -5,7 +5,6 @@
 import { useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import authService from '@services/api/authService';
 import { useAuthStore } from '@store/authStore';
 import { ROUTES, STORAGE_KEYS } from '@constants/index';

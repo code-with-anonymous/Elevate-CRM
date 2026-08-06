@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useMutation } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
 import AuthLayout from '@/components/auth/AuthLayout';
 import OtpInput from '@/components/auth/OtpInput';
 import { Button } from '@/components/ui/button';

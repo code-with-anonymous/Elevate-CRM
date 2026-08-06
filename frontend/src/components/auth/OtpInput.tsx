@@ -1,5 +1,4 @@
-import OtpInputComponent from 'react-otp-input';
-import { cn } from '@/lib/cn';
+import OTPInput from 'react-otp-input';
 import { OTP_LENGTH } from '@/constants';
 
 export interface OtpInputProps {

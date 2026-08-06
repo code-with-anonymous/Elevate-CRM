@@ -140,7 +140,7 @@ async function sendPasswordResetEmail(email, token) {
 }
 
 async function sendInvitationEmail(email, inviterName, orgName, token) {
-  const inviteUrl = `${env.CLIENT_URL}/invite?token=${token}`;
+  const inviteUrl = `${env.CLIENT_URL}/invite/${token}`;
   const html = emailWrapper(`
     <h2 style="margin:0 0 8px;color:#111827;font-size:22px;">You're invited to join ${orgName}</h2>
     <p style="color:#6b7280;margin:0 0 24px;"><strong>${inviterName}</strong> has invited you to join <strong>${orgName}</strong> on ElevateCRM. Click below to accept the invitation. This link expires in <strong>24 hours</strong>.</p>

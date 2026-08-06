@@ -243,7 +243,13 @@ const authService = {
   },
 
   // ── Invitations ───────────────────────────────────────────────────────────
-
+  inviteUser: async (data: { email: string; role: string }) => {
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.AUTH.INVITE_TOKEN, // This uses '/auth/invite' from your constants
+      data
+    );
+    return response.data;
+  },
   /**
    * Accept team invitation and create account
    * POST /auth/accept-invite
@@ -291,6 +297,7 @@ const authService = {
     return response.data.data;
   },
 
+
   /**
    * Revoke a specific session by ID
    * DELETE /auth/sessions/:sessionId
@@ -301,6 +308,8 @@ const authService = {
     );
     return response.data;
   },
+
+  
 };
 
 export default authService;

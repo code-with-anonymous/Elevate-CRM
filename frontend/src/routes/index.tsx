@@ -41,10 +41,16 @@ const SessionExpiredPage = lazy(() => import('@pages/auth/SessionExpiredPage'));
 const UnauthorizedPage = lazy(() => import('@pages/auth/UnauthorizedPage'));
 const AccessDeniedPage = lazy(() => import('@pages/auth/AccessDeniedPage'));
 const NotFoundPage = lazy(() => import('@pages/auth/NotFoundPage'));
+const TeamsPage = lazy(() => import('@pages/teams/TeamsPage')); 
 
 // ── Lazy Page Imports — App ────────────────────────────────────────────────────
 
-const DashboardPage = lazy(() => import('@pages/dashboard/DashboardPage'));
+const DashboardPage   = lazy(() => import('@pages/dashboard/DashboardPage'));
+const LeadsPage       = lazy(() => import('@pages/leads/LeadsPage'));
+const LeadDetailPage  = lazy(() => import('@pages/leads/LeadDetailPage'));
+const PipelinePage    = lazy(() => import('@pages/pipeline/PipelinePage'));
+const ContactsPage    = lazy(() => import('@pages/contacts/ContactsPage'));
+const TasksPage       = lazy(() => import('@pages/tasks/TasksPage'));
 const DashboardLayout = lazy(() => import('@components/layout/DashboardLayout'));
 
 // ── Suspense Wrapper ──────────────────────────────────────────────────────────
@@ -170,9 +176,9 @@ export const router = createBrowserRouter([
     ),
   },
 
-  // ── Protected app routes ───────────────────────────────────────────────────
+  // ── Protected App Routes (Inside Dashboard Layout) ─────────────────────────
   {
-    path: ROUTES.DASHBOARD,
+    path: '/',
     element: (
       <Lazy>
         <ProtectedRoute>
@@ -184,10 +190,58 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
-        index: true,
+        path: 'dashboard',
         element: (
           <Lazy>
             <DashboardPage />
+          </Lazy>
+        ),
+      },
+      {
+        path: 'leads',
+        element: (
+          <Lazy>
+            <LeadsPage />
+          </Lazy>
+        ),
+      },
+      {
+        path: 'leads/:id',
+        element: (
+          <Lazy>
+            <LeadDetailPage />
+          </Lazy>
+        ),
+      },
+      {
+        path: 'pipeline',
+        element: (
+          <Lazy>
+            <PipelinePage />
+          </Lazy>
+        ),
+      },
+      {
+        path: 'contacts',
+        element: (
+          <Lazy>
+            <ContactsPage />
+          </Lazy>
+        ),
+      },
+      {
+        path: 'tasks',
+        element: (
+          <Lazy>
+            <TasksPage />
+          </Lazy>
+        ),
+      },
+      {
+        path: 'dashboard/teams',
+        element: (
+          <Lazy>
+            <TeamsPage />
           </Lazy>
         ),
       },

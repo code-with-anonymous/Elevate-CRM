@@ -3,8 +3,6 @@
 // Full dashboard shell — Sidebar + TopNavbar + main content area
 // ─────────────────────────────────────────────────────────────────────────────
 import type { ReactNode } from 'react';
-import { useAuthActions } from '@/hooks/useAuthActions';
-import { useAuth } from '@/hooks/useAuth';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Button } from '@/components/ui/button';
 import Sidebar from './Sidebar';
