@@ -1,3 +1,14 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// src/components/auth/OtpInput.tsx
+//
+// FIXED: the component imported `OTPInput` but rendered `<OtpInputComponent>`,
+// an identifier that was never declared. Two consequences:
+//   · `tsc -b` failed, so `npm run build` exited 1 and never reached vite —
+//     any CI or Vercel deploy died here.
+//   · At runtime it threw a ReferenceError, so OtpPage and TwoFactorPage
+//     crashed on render. OTP sign-in and 2FA verification were both broken.
+// ─────────────────────────────────────────────────────────────────────────────
+import type { ComponentProps } from 'react';
 import OTPInput from 'react-otp-input';
 import { OTP_LENGTH } from '@/constants';
 
@@ -10,12 +21,14 @@ export interface OtpInputProps {
 export function OtpInput({ value, onChange, error }: OtpInputProps) {
   return (
     <div className="flex w-full justify-center">
-      <OtpInputComponent
+      <OTPInput
         value={value}
         onChange={onChange}
         numInputs={OTP_LENGTH}
         renderSeparator={<span className="w-2" />}
-        renderInput={(props) => <input {...props} />}
+        // Explicitly typed — the library's callback parameter was implicitly
+        // `any`, which `noImplicitAny` rejected.
+        renderInput={(props: ComponentProps<'input'>) => <input {...props} />}
         inputStyle={{
           width: '3rem',
           height: '3.5rem',

@@ -49,16 +49,28 @@ export default function LeadsBySourceCard() {
   const total = chartData.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
 
   return (
-    <DashCard interactive className="h-full min-h-[250px] p-6">
+    // `h-full` removed. Combined with the page's `flex-1` wrapper it made this
+    // card absorb every spare pixel in the right-hand column — and because the
+    // column stretches to the tallest column in the grid row, the empty state
+    // became a ~600px card with one small icon adrift in the middle.
+    //
+    // A natural height with a sensible floor is honest in both states: ~250px
+    // empty, ~250-290px with a donut and legend.
+    <DashCard interactive className="min-h-[250px] p-6">
       <DashCardHeader title="Leads by Source" subtitle="Distribution across channels" />
 
       {chartData.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center text-center">
+        // Fixed height rather than flex-1, so this can't inflate again if a
+        // future layout hands the card extra room.
+        <div className="flex h-[150px] flex-col items-center justify-center text-center">
           <PieIcon size={20} className="mb-2 text-muted-foreground/60" />
           <p className="text-xs text-muted-foreground">No source data yet.</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground/70">
+            Add leads with a source to see the split.
+          </p>
         </div>
       ) : (
-        <div className="mt-3 flex flex-1 flex-col items-center gap-4 md:flex-row">
+        <div className="mt-3 flex flex-col items-center gap-4 md:flex-row">
           <div className="relative h-[140px] w-full md:w-1/2">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>

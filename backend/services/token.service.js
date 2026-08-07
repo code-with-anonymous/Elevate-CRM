@@ -85,24 +85,41 @@ function generateRandomToken(bytes = 32) {
  * @param {import('express').Response} res
  * @param {string} token  — raw JWT (not hashed)
  */
+/**
+ * Cookie attributes for the refresh token.
+ *
+ * Was hardcoded to `sameSite: 'strict'` in production, which silently breaks a
+ * split deployment: a Strict cookie is NEVER sent on a cross-site request, so
+ * with the app on vercel.app and the API on onrender.com, POST /auth/refresh
+ * arrives with no cookie. The user gets signed out ~15 minutes after logging
+ * in, every time, and it reads as broken auth rather than a cookie policy.
+ *
+ *   CROSS_SITE_COOKIES=true  → SameSite=None; Secure   (different domains)
+ *   otherwise in production  → SameSite=Lax;  Secure   (shared domain)
+ *   development              → SameSite=Lax            (http://localhost)
+ *
+ * `None` REQUIRES `Secure` — browsers silently drop the cookie otherwise — so
+ * secure is forced on whenever cross-site is enabled.
+ */
+function refreshCookieOptions() {
+  const crossSite = env.CROSS_SITE_COOKIES;
+  return {
+    httpOnly: true,
+    secure:   crossSite || env.IS_PROD,
+    sameSite: crossSite ? 'none' : 'lax',
+    path:     '/',
+  };
+}
+
 function setRefreshCookie(res, token) {
   const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
-  res.cookie('refreshToken', token, {
-    httpOnly: true,
-    secure:   env.IS_PROD,  // HTTPS only in prod
-    sameSite: env.IS_PROD ? 'strict' : 'lax',
-    maxAge,
-    path:     '/',
-  });
+  res.cookie('refreshToken', token, { ...refreshCookieOptions(), maxAge });
 }
 
 function clearRefreshCookie(res) {
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure:   env.IS_PROD,
-    sameSite: env.IS_PROD ? 'strict' : 'lax',
-    path:     '/',
-  });
+  // Attributes must match the ones used to set it, or the browser keeps the
+  // original cookie and "logout" leaves a live refresh token behind.
+  res.clearCookie('refreshToken', refreshCookieOptions());
 }
 
 // ── DB helpers ────────────────────────────────────────────────────────────────

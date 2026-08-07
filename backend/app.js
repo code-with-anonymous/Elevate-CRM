@@ -32,6 +32,22 @@ const searchRoutes    = require('./routes/search.routes');
 
 const app = express();
 
+// ── Proxy trust ────────────────────────────────────────────────────────────────
+// Render (and Vercel, Fly, Heroku, any load balancer) terminates TLS and
+// forwards the request over http, with the real client details in
+// X-Forwarded-*. Without this:
+//   · req.ip is the proxy's address, so express-rate-limit buckets EVERY user
+//     together — "5 login attempts per 15 minutes" becomes 5 for the whole
+//     internet, and one person locks out all of them.
+//   · req.secure is false, and express-rate-limit v7 emits a validation error
+//     when it sees X-Forwarded-For it was not told to trust.
+//
+// `1` (not `true`) trusts exactly one hop — the platform's own proxy. Trusting
+// all hops would let a client spoof X-Forwarded-For and bypass rate limiting.
+if (env.IS_PROD) {
+  app.set('trust proxy', 1);
+}
+
 // ── Security headers ───────────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },

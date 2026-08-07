@@ -35,6 +35,8 @@ export default function LeadActivityTable() {
   };
 
   return (
+    // DashCard already sets `flex flex-col overflow-hidden`, which is what lets
+    // the scroll region below shrink and clip cleanly.
     <DashCard className="min-h-[300px] flex-1 p-6">
       <DashCardHeader
         title="Lead Activity"
@@ -50,7 +52,24 @@ export default function LeadActivityTable() {
         }
       />
 
-      <div className="mt-4 flex-1 overflow-x-auto">
+      {/* The endpoint returns the last 20 movements and this used to render all
+          of them at natural height, which made the centre column ~1300px — far
+          taller than either side column. Since a CSS grid row is as tall as its
+          tallest item, this one card was stretching the whole dashboard.
+
+          Bounded + scrollable instead of truncated: every row is still
+          reachable, it just no longer dictates the page height.
+
+          `min-h-0` is the load-bearing part. A flex child defaults to
+          min-height:auto, so it refuses to shrink below its content and
+          `overflow-y-auto` never engages — the list would keep pushing the card
+          taller no matter what max-height said. */}
+      {/* 300px ≈ 5-6 rows. This is a TUNED CONSTANT, and it's the one knob to
+          turn if the balance drifts: with the chart above it (~400px) it puts
+          the centre column at roughly 800px, which is about where the left
+          column lands with its four cards. Raise it and the centre starts
+          driving the row height again; lower it and the panel feels cramped. */}
+      <div className="mt-4 min-h-0 max-h-[300px] flex-1 overflow-y-auto overflow-x-auto">
         {isLoading ? (
           <ActivitySkeleton />
         ) : isError ? (
@@ -69,18 +88,21 @@ export default function LeadActivityTable() {
           <table className="w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr>
+                {/* Sticky now that the body scrolls — column labels scrolling
+                    away from their own data is worse than no labels. bg-card is
+                    required, or rows show through the transparent header. */}
                 {['Name', 'Date', 'Time', 'Status'].map((h) => (
                   <th
                     key={h}
-                    className="whitespace-nowrap border-b border-border/60 pb-2.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                    className="sticky top-0 z-10 whitespace-nowrap border-b border-border/60 bg-card pb-2.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
                   >
                     {h}
                   </th>
                 ))}
-                <th className="whitespace-nowrap border-b border-border/60 pb-2.5 text-right text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                <th className="sticky top-0 z-10 whitespace-nowrap border-b border-border/60 bg-card pb-2.5 text-right text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Value
                 </th>
-                <th className="w-px border-b border-border/60" />
+                <th className="sticky top-0 z-10 w-px border-b border-border/60 bg-card" />
               </tr>
             </thead>
 

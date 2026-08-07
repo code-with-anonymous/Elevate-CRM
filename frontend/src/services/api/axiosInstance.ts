@@ -52,6 +52,40 @@ function getAuthStore(): {
   }
 }
 
+// ── Transient vs. terminal failures ───────────────────────────────────────────
+//
+// THE distinction this file got wrong. A refresh call can fail two ways and they
+// mean opposite things:
+//
+//   TERMINAL  — the server answered 401/403. The refresh cookie is missing,
+//               expired, or revoked. The user really is signed out.
+//   TRANSIENT — timeout, DNS failure, connection refused, 5xx. We learned
+//               nothing about the session; the server just isn't answering.
+//
+// Treating transient as terminal is what makes a sleeping Render instance look
+// like broken auth: cold start > 30s → refresh times out → clearAuth() →
+// bounced to /session-expired, with a perfectly valid cookie still in the jar.
+
+/** True only when the SERVER rejected us. Network noise is not an auth answer. */
+function isAuthRejection(error: unknown): boolean {
+  const status = (error as AxiosError)?.response?.status;
+  return status === 401 || status === 403;
+}
+
+/** Timeout, offline, DNS, connection refused — no response ever arrived. */
+function isTransientFailure(error: unknown): boolean {
+  const err = error as AxiosError;
+  if (err?.response) return err.response.status >= 500;
+  return true;
+}
+
+// A cold container has to boot Node, connect to Atlas, and answer — routinely
+// 30-60s on Render's free tier. The refresh call gates the whole session, so it
+// gets a longer budget than a normal request and two extra attempts.
+const REFRESH_TIMEOUT_MS = 45_000;
+const REFRESH_MAX_ATTEMPTS = 3;
+const REFRESH_BACKOFF_MS = [0, 2_000, 5_000];
+
 // ── Refresh token state — prevent concurrent refresh calls ────────────────────
 
 let isRefreshing = false;
@@ -81,6 +115,71 @@ const axiosInstance: AxiosInstance = axios.create({
   },
   timeout: 30_000, // 30 seconds
 });
+
+// ── Refresh with cold-start tolerance ─────────────────────────────────────────
+
+/**
+ * POST /auth/refresh, retrying only on transient failures.
+ *
+ * The retry exists for one specific scenario: a Render free-tier instance that
+ * spun down after 15 minutes idle. The first attempt times out while the
+ * container boots; by attempt two or three it's answering.
+ *
+ * A 401/403 aborts immediately — retrying a rejected token just delays the
+ * inevitable sign-out by seven seconds.
+ */
+async function refreshWithRetry(): Promise<AxiosResponse> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < REFRESH_MAX_ATTEMPTS; attempt++) {
+    if (REFRESH_BACKOFF_MS[attempt] > 0) {
+      await new Promise((resolve) => setTimeout(resolve, REFRESH_BACKOFF_MS[attempt]));
+    }
+
+    try {
+      const response = await axiosInstance.post<RefreshTokenResponse>(
+        API_ENDPOINTS.AUTH.REFRESH,
+        {},
+        {
+          // `_isRetry` keeps this call out of the 401 branch, so a failing
+          // refresh can never trigger another refresh.
+          _isRetry: true,
+          timeout: REFRESH_TIMEOUT_MS,
+        } as RetryConfig
+      );
+      // The server answered — clear the "waking up" notice if we showed one.
+      toast.dismiss('api-cold-start');
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (!isTransientFailure(error)) throw error;
+
+      // Tell the user why the app is hanging, once, on the first stall. Without
+      // this a cold start is 45 seconds of nothing.
+      if (attempt === 0) {
+        toast.loading('Waking up the server…', { id: 'api-cold-start', duration: 20_000 });
+      }
+    }
+  }
+
+  toast.dismiss('api-cold-start');
+  throw lastError;
+}
+
+/**
+ * Fire-and-forget ping so the container starts booting while the user is still
+ * reading the login screen, instead of on their first real request.
+ *
+ * Deliberately NOT on `axiosInstance`: /health sits outside /api, needs no
+ * credentials, and must never touch the auth interceptors.
+ */
+export function warmUpApi(): void {
+  const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api';
+  const healthUrl = `${base.replace(/\/api\/?$/, '')}/health`;
+
+  // Errors are meaningless here — this is a nudge, not a check.
+  void fetch(healthUrl, { method: 'GET', mode: 'cors' }).catch(() => {});
+}
 
 // ── Request Interceptor — attach access token ─────────────────────────────────
 
@@ -132,11 +231,7 @@ axiosInstance.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const response = await axiosInstance.post<RefreshTokenResponse>(
-          API_ENDPOINTS.AUTH.REFRESH,
-          {},
-          { _isRetry: true } as RetryConfig // prevent refresh loop
-        );
+        const response = await refreshWithRetry();
 
         // Backend returns { success, message, data: { tokens: { accessToken, expiresIn } } }
         const responseData = response.data as unknown as { data: { tokens: { accessToken: string; expiresIn: number } } };
@@ -163,7 +258,19 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
 
-        // Refresh failed — clear auth and redirect
+        // ── The fix ──────────────────────────────────────────────────────────
+        // Only tear down the session when the SERVER said no. If we simply
+        // couldn't reach it, the cookie is still valid and the next request
+        // will try again — signing the user out here would throw away a working
+        // session because a container was asleep.
+        if (!isAuthRejection(refreshError)) {
+          toast.error(
+            'Can’t reach the server right now. Your session is still active — try again in a moment.',
+            { id: 'api-unreachable', duration: 6000 }
+          );
+          return Promise.reject(refreshError);
+        }
+
         const store = getAuthStore();
         store?.clearAuth();
 

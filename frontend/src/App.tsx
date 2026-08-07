@@ -11,6 +11,7 @@ import { router } from '@routes/index';
 import { RouterProvider } from 'react-router-dom';
 import { useAppBootstrap } from '@/hooks/useAuthActions';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
+import { warmUpApi } from '@/services/api/axiosInstance';
 import { useEffect } from 'react';
 
 const queryClient = new QueryClient({
@@ -30,6 +31,10 @@ function AppContent() {
   const { bootstrap } = useAppBootstrap();
 
   useEffect(() => {
+    // Nudge the API awake before anything needs it. On a spun-down Render
+    // instance the boot happens while the user reads the page, instead of
+    // stalling their first real request for 45 seconds.
+    warmUpApi();
     bootstrap();
   }, [bootstrap]);
 

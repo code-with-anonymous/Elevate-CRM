@@ -43,6 +43,20 @@ export default function RevenueGoalCard() {
   }));
   const totalWon = revenueData?.totalWon ?? stats?.weeklyRevenue?.amount ?? 0;
 
+  // The trend is background chrome painted ACROSS the figure, which only works
+  // when the line actually moves. A flat series renders as a horizontal rule at
+  // the vertical centre of the band — straight through "$0" — so it reads as a
+  // strikethrough rather than a chart.
+  //
+  // With every value 0 the domain is ['dataMin - 10000', 'dataMax + 10000'] =
+  // [-10000, 10000], which puts zero exactly at mid-height. Same problem for any
+  // all-identical series. So: only draw it when there's real movement to show.
+  const trendValues = chartData.map((d: { value: number }) => Number(d.value) || 0);
+  const hasTrend =
+    trendValues.length >= 2 &&
+    trendValues.some((v: number) => v > 0) &&
+    new Set(trendValues).size > 1;
+
   if (isLoading) {
     return <DashCardSkeleton className="h-48" lines={1} showChart />;
   }
@@ -84,30 +98,36 @@ export default function RevenueGoalCard() {
         </p>
       </div>
 
-      {/* Trend runs edge-to-edge behind the figure and the buttons */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-[52px] top-16 opacity-70">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="revenueGoalFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={chartColor.primary} stopOpacity={0.28} />
-                <stop offset="100%" stopColor={chartColor.primary} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <YAxis domain={['dataMin - 10000', 'dataMax + 10000']} hide />
-            <XAxis dataKey="name" hide />
-            <Area
-              type="monotone"
-              dataKey="value"
-              stroke={chartColor.primary}
-              strokeWidth={1.75}
-              fillOpacity={1}
-              fill="url(#revenueGoalFill)"
-              isAnimationActive
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      {/* Trend runs edge-to-edge behind the figure and the buttons.
+          Omitted entirely when flat — see `hasTrend`. */}
+      {hasTrend && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[52px] top-16 opacity-70">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="revenueGoalFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={chartColor.primary} stopOpacity={0.28} />
+                  <stop offset="100%" stopColor={chartColor.primary} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              {/* Anchored at 0 rather than `dataMin - 10000`: a floor below zero
+                  pushes a low series up into the text, which is the same
+                  collision in a milder form. */}
+              <YAxis domain={[0, 'dataMax + 10000']} hide />
+              <XAxis dataKey="name" hide />
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={chartColor.primary}
+                strokeWidth={1.75}
+                fillOpacity={1}
+                fill="url(#revenueGoalFill)"
+                isAnimationActive
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <div className="relative z-10 mt-3 flex gap-2">
         <button

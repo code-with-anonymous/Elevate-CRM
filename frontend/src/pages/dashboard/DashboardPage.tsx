@@ -69,7 +69,10 @@ export default function DashboardPage() {
           <motion.div variants={staggerItem}>
             <AIInsightsCard />
           </motion.div>
-          <motion.div variants={staggerItem} className="min-h-[250px] flex-1">
+          {/* `min-h-[250px] flex-1` removed — flex-1 told this card to swallow
+              all leftover height in the column, which is what stretched the
+              empty state. The card owns its own min-height now. */}
+          <motion.div variants={staggerItem}>
             <LeadsBySourceCard />
           </motion.div>
         </div>
