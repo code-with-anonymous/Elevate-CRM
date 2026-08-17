@@ -11,6 +11,22 @@ export interface LeadFilterParams {
   sortOrder?: 'asc' | 'desc';
 }
 
+/** POST /leads/:id/ai-summary. riskScore is 0 = safe … 100 = probably lost. */
+export interface LeadAISummary {
+  summary: string;
+  riskScore: number;
+  priority: 'High' | 'Medium' | 'Low';
+  nextBestAction: string;
+  generatedAt: string;
+}
+
+/** POST /leads/:id/ai-email. Draft only — nothing is sent. */
+export interface LeadAIEmail {
+  subject: string;
+  body: string;
+  generatedAt: string;
+}
+
 export const leadsService = {
   getLeads: async (params: LeadFilterParams = {}) => {
     const searchParams = new URLSearchParams();
@@ -51,6 +67,23 @@ export const leadsService = {
 
   getOrgUsers: async () => {
     const res = await axiosInstance.get('/leads/users');
+    return res.data.data;
+  },
+
+  // ── AI (Gemini, server-side) ───────────────────────────────────────────────
+  // POSTs because each call performs paid work; nothing is cached or persisted.
+
+  getAISummary: async (id: string): Promise<LeadAISummary> => {
+    const res = await axiosInstance.post(`/leads/${id}/ai-summary`);
+    return res.data.data;
+  },
+
+  /** `purpose` and `tone` must be allowlist keys — see AI_PURPOSES / AI_TONES. */
+  generateAIEmail: async (
+    id: string,
+    payload: { purpose: string; tone: string }
+  ): Promise<LeadAIEmail> => {
+    const res = await axiosInstance.post(`/leads/${id}/ai-email`, payload);
     return res.data.data;
   },
 };

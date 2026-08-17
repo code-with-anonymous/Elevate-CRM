@@ -108,35 +108,16 @@ export const STORAGE_KEYS = {
 } as const;
 
 // ── Permission Codes ──────────────────────────────────────────────────────────
-export const PERMISSIONS = {
-  // Leads
-  LEADS_VIEW: 'leads:view',
-  LEADS_CREATE: 'leads:create',
-  LEADS_UPDATE: 'leads:update',
-  LEADS_DELETE: 'leads:delete',
-  // Contacts
-  CONTACTS_VIEW: 'contacts:view',
-  CONTACTS_CREATE: 'contacts:create',
-  CONTACTS_UPDATE: 'contacts:update',
-  CONTACTS_DELETE: 'contacts:delete',
-  // Deals
-  DEALS_VIEW: 'deals:view',
-  DEALS_CREATE: 'deals:create',
-  DEALS_UPDATE: 'deals:update',
-  DEALS_DELETE: 'deals:delete',
-  // Team
-  TEAM_VIEW: 'team:view',
-  TEAM_INVITE: 'team:invite',
-  TEAM_REMOVE: 'team:remove',
-  TEAM_MANAGE_ROLES: 'team:manage-roles',
-  // Settings
-  SETTINGS_VIEW: 'settings:view',
-  SETTINGS_MANAGE: 'settings:manage',
-  BILLING_VIEW: 'billing:view',
-  BILLING_MANAGE: 'billing:manage',
-  // Reports
-  REPORTS_VIEW: 'reports:view',
-  REPORTS_EXPORT: 'reports:export',
-} as const;
-
-export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+//
+// Re-exported from ./permissions so `@/constants` and `@/constants/permissions`
+// cannot disagree. This file used to declare its own list — `leads:view`,
+// `leads:create`, `leads:update`, `team:invite`, `billing:manage` and so on —
+// which nothing imported and no server route had ever heard of. Two exports
+// named PERMISSIONS with different string values is a landmine: the first
+// component to gate on `leads:create` would have hidden itself forever, because
+// the server grants `leads:write`.
+//
+// The surviving vocabulary is the one the API actually enforces: read / write /
+// delete per resource, since POST and PATCH share a single guard server-side.
+export { PERMISSIONS, ROLE_PERMISSIONS, permissionsForRole } from './permissions';
+export type { Permission } from './permissions';

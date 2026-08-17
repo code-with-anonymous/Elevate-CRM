@@ -37,6 +37,8 @@ import {
 
 import { useCreateDeal, useDeals, useDeleteDeal } from '@hooks/useDeals';
 import { usePipelineDrag } from '@hooks/usePipelineDrag';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/constants/permissions';
 import type { Deal, DealStage } from '@services/api/dealService';
 
 import {
@@ -52,9 +54,10 @@ import {
 
 import AvatarWithInitials from '@/components/common/AvatarWithInitials';
 import PageHeader from '@/components/common/PageHeader';
+import DealInsightPopover from '@/components/pipeline/DealInsightPopover';
 import { Button } from '@/components/ui/button';
 import { Field, controlClass, selectClass } from '@/components/ui/field';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatMoney } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { DURATION, EASE_OUT, overlayVariants, pageVariants } from '@/lib/motion';
 
@@ -81,24 +84,6 @@ const STAGES: StageConfig[] = [
 /** Past this, a column is a bottleneck worth flagging — but never blocking. */
 const WIP_THRESHOLD = 10;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// Cached per currency; constructing Intl.NumberFormat per card is expensive.
-const currencyFormatters = new Map<string, Intl.NumberFormat>();
-
-function fmt(n: number, currency = 'USD') {
-  let formatter = currencyFormatters.get(currency);
-  if (!formatter) {
-    formatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    });
-    currencyFormatters.set(currency, formatter);
-  }
-  return formatter.format(n);
-}
-
 // ── Deal Card ─────────────────────────────────────────────────────────────────
 
 interface DealCardProps {
@@ -110,6 +95,11 @@ interface DealCardProps {
 function DealCard({ deal, isDragging = false, onDelete }: DealCardProps) {
   const cfg = STAGES.find((s) => s.key === deal.stage) ?? STAGES[0];
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: deal.id });
+  // Dropping a card PATCHes the deal's stage, so the grip needs deals:write.
+  // Leaving it for a viewer would let them drag a card across the board and
+  // watch it snap back when the request 403s.
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.DEALS_WRITE);
 
   const style: React.CSSProperties = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
@@ -118,10 +108,61 @@ function DealCard({ deal, isDragging = false, onDelete }: DealCardProps) {
   const company = deal.leadId?.company;
   const assignee = deal.assignedTo;
 
+  // Anchor rect for the insight panel. Null = closed. Captured on enter rather
+  // than measured by the panel so there is exactly one read of the DOM per open.
+  const [insightAnchor, setInsightAnchor] = useState<DOMRect | null>(null);
+  const cardRef = React.useRef<HTMLDivElement | null>(null);
+  const openTimer = React.useRef<number>();
+
+  // The overlay card and any card mid-drag never show the panel: it would track
+  // a stale rect, and a tooltip chasing the cursor during a drag is noise.
+  const insightEnabled = !isDragging && !transform;
+
+  const closeInsight = React.useCallback(() => {
+    window.clearTimeout(openTimer.current);
+    setInsightAnchor(null);
+  }, []);
+
+  const openInsight = () => {
+    if (!insightEnabled) return;
+    window.clearTimeout(openTimer.current);
+    // Sweeping the cursor across a column shouldn't strobe six panels. The delay
+    // means the panel only appears where the pointer actually settles.
+    openTimer.current = window.setTimeout(() => {
+      const rect = cardRef.current?.getBoundingClientRect();
+      if (rect) setInsightAnchor(rect);
+    }, 260);
+  };
+
+  React.useEffect(() => {
+    if (!insightEnabled) closeInsight();
+  }, [insightEnabled, closeInsight]);
+
+  // A `fixed` panel does not follow its anchor. Rather than reposition on every
+  // frame, close it — the board scrolls horizontally and the cursor has already
+  // left the card by the time a scroll finishes.
+  React.useEffect(() => {
+    if (!insightAnchor) return;
+    window.addEventListener('scroll', closeInsight, true);
+    window.addEventListener('resize', closeInsight);
+    return () => {
+      window.removeEventListener('scroll', closeInsight, true);
+      window.removeEventListener('resize', closeInsight);
+    };
+  }, [insightAnchor, closeInsight]);
+
+  React.useEffect(() => () => window.clearTimeout(openTimer.current), []);
+
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        cardRef.current = node;
+      }}
       style={style}
+      onPointerEnter={openInsight}
+      onPointerLeave={closeInsight}
+      onPointerDown={closeInsight}
       className={cn(
         'group relative rounded-xl border bg-card p-3',
         'transition-[border-color,box-shadow,transform] duration-150 ease-out',
@@ -130,7 +171,13 @@ function DealCard({ deal, isDragging = false, onDelete }: DealCardProps) {
           : 'border-border/60 hover:border-border hover:shadow-sm'
       )}
     >
-      <div className="flex items-start justify-between gap-2">
+      {/* Header. The action cluster is a real flex child, not an absolute overlay
+          — the previous version pinned it over the top-right corner where the
+          assignee avatar already sat, so the grip landed on top of the avatar and
+          there was no readable "drag me" target. Both buttons hold their space at
+          rest (row-actions animates opacity only), so revealing them shifts
+          nothing. The avatar moved down to the meta row. */}
+      <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           {/* Company reads as the quiet label above the deal itself */}
           <p className="truncate text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -141,18 +188,47 @@ function DealCard({ deal, isDragging = false, onDelete }: DealCardProps) {
           </h4>
         </div>
 
-        {assignee && (
-          <AvatarWithInitials
-            firstName={assignee.firstName}
-            lastName={assignee.lastName}
-            size="sm"
-            className="mt-0.5"
-          />
-        )}
+        <div className="-mr-1 -mt-1 flex shrink-0 items-center gap-0.5">
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(deal.id);
+              }}
+              className="row-actions flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
+              title="Delete deal"
+              aria-label="Delete deal"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+
+          {/* Deliberately NOT inside row-actions: the grip is the only way to move
+              a card, so hiding it until hover is what left people unsure the board
+              was draggable at all. It rests at 50% and comes up to full on hover. */}
+          {canWrite && (
+            <button
+              {...listeners}
+              {...attributes}
+              className="flex h-6 w-6 cursor-grab items-center justify-center rounded text-muted-foreground opacity-50 transition duration-150 hover:bg-muted hover:text-foreground group-hover:opacity-100 active:cursor-grabbing"
+              title="Drag to move stage"
+              aria-label={`Drag ${deal.title} to another stage`}
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-3 flex items-end justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+          {assignee && (
+            <AvatarWithInitials
+              firstName={assignee.firstName}
+              lastName={assignee.lastName}
+              size="xs"
+            />
+          )}
           {deal.expectedCloseDate && (
             <>
               <CalendarDays size={11} className="shrink-0" />
@@ -173,35 +249,15 @@ function DealCard({ deal, isDragging = false, onDelete }: DealCardProps) {
             'bg-status-positive/10 text-status-positive ring-status-positive/20'
           )}
         >
-          {fmt(deal.value, deal.currency)}
+          {formatMoney(deal.value, deal.currency)}
         </span>
       </div>
 
-      {/* Hover chrome — grip and delete, revealed together */}
-      <div className="row-actions absolute right-1.5 top-1.5 flex items-center gap-0.5">
-        {onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(deal.id);
-            }}
-            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
-            title="Delete deal"
-            aria-label="Delete deal"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+      <AnimatePresence>
+        {insightAnchor && (
+          <DealInsightPopover key="insight" deal={deal} anchor={insightAnchor} />
         )}
-        <button
-          {...listeners}
-          {...attributes}
-          className="flex h-6 w-6 cursor-grab items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:cursor-grabbing"
-          title="Drag to move"
-          aria-label="Drag to move"
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -211,7 +267,8 @@ function DealCard({ deal, isDragging = false, onDelete }: DealCardProps) {
 interface KanbanColumnProps {
   stage: StageConfig;
   deals: Deal[];
-  onDelete: (id: string) => void;
+  /** Omitted when the viewer lacks deals:delete — DealCard hides its button. */
+  onDelete?: (id: string) => void;
   onAddDeal: (stage: DealStage) => void;
 }
 
@@ -220,6 +277,8 @@ function KanbanColumn({ stage, deals, onDelete, onAddDeal }: KanbanColumnProps) 
     id: stage.key,
     data: { stage: stage.key },
   });
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.DEALS_WRITE);
 
   const total = deals.reduce((s, d) => s + d.value, 0);
   const overWip = deals.length >= WIP_THRESHOLD;
@@ -252,14 +311,16 @@ function KanbanColumn({ stage, deals, onDelete, onAddDeal }: KanbanColumnProps) 
           </p>
         </div>
 
-        <button
-          onClick={() => onAddDeal(stage.key)}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
-          title={`Add deal to ${stage.label}`}
-          aria-label={`Add deal to ${stage.label}`}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => onAddDeal(stage.key)}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
+            title={`Add deal to ${stage.label}`}
+            aria-label={`Add deal to ${stage.label}`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Drop zone */}
@@ -279,18 +340,22 @@ function KanbanColumn({ stage, deals, onDelete, onAddDeal }: KanbanColumnProps) 
 
         {deals.length === 0 && (
           <div className="mt-1 flex h-20 items-center justify-center rounded-lg border border-dashed border-border/60">
-            <span className="text-[11px] text-muted-foreground">Drop a deal here</span>
+            <span className="text-[11px] text-muted-foreground">
+              {canWrite ? 'Drop a deal here' : 'No deals in this stage'}
+            </span>
           </div>
         )}
 
         {/* Second add affordance — reaching the top of a long column is a chore */}
-        <button
-          onClick={() => onAddDeal(stage.key)}
-          className="mt-auto flex items-center justify-center gap-1 rounded-lg border border-dashed border-border/60 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-border hover:bg-card hover:text-foreground"
-        >
-          <Plus className="h-3 w-3" />
-          Add deal
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => onAddDeal(stage.key)}
+            className="mt-auto flex items-center justify-center gap-1 rounded-lg border border-dashed border-border/60 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-border hover:bg-card hover:text-foreground"
+          >
+            <Plus className="h-3 w-3" />
+            Add deal
+          </button>
+        )}
       </div>
     </div>
   );
@@ -458,6 +523,11 @@ export default function PipelinePage() {
   const { mutate: deleteDeal } = useDeleteDeal();
   const { mutate: createDeal, isPending: isCreating } = useCreateDeal();
 
+  // Mirrors deals.routes.js — write is member+, delete is manager+.
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.DEALS_WRITE);
+  const canDelete = can(PERMISSIONS.DEALS_DELETE);
+
   const [modalStage, setModalStage] = useState<DealStage | null>(null);
   const [search, setSearch] = useState('');
 
@@ -545,10 +615,12 @@ export default function PipelinePage() {
                   className="h-9 w-44 rounded-lg border border-transparent bg-muted/60 pl-9 pr-3 text-sm outline-none transition-colors duration-150 placeholder:text-muted-foreground hover:bg-muted focus:border-primary/40 focus:bg-background focus:ring-2 focus:ring-primary/15 sm:w-56"
                 />
               </div>
-              <Button onClick={() => setModalStage('Lead')}>
-                <Plus size={15} />
-                <span className="hidden sm:inline">Add Deal</span>
-              </Button>
+              {canWrite && (
+                <Button onClick={() => setModalStage('Lead')}>
+                  <Plus size={15} />
+                  <span className="hidden sm:inline">Add Deal</span>
+                </Button>
+              )}
             </>
           }
         />
@@ -581,7 +653,9 @@ export default function PipelinePage() {
                     key={stage.key}
                     stage={stage}
                     deals={byStage[stage.key]}
-                    onDelete={(id) => deleteDeal(id)}
+                    /* DealCard already treats an absent onDelete as "no delete
+                       button", so withholding it is the whole gate. */
+                    onDelete={canDelete ? (id) => deleteDeal(id) : undefined}
                     onAddDeal={(s) => setModalStage(s)}
                   />
                 ))}

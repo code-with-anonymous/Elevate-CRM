@@ -53,6 +53,8 @@ import {
   useDeleteTask,
 } from '@/hooks/useTasks';
 import { useTaskDrag } from '@/hooks/useTaskDrag';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/constants/permissions';
 import { TaskItem } from '@/services/api/taskService';
 import { formatRelativeDate, isOverdue } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -143,6 +145,10 @@ interface TaskCardProps {
 function TaskCard({ task, isDragging = false, onStatusChange, onComplete }: TaskCardProps) {
   const taskId = task.id || task._id || '';
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: taskId });
+  // Read straight from the store rather than threading a prop down through
+  // BoardColumn — it's a selector, not a fetch.
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.TASKS_WRITE);
 
   const style: React.CSSProperties = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
@@ -168,6 +174,8 @@ function TaskCard({ task, isDragging = false, onStatusChange, onComplete }: Task
           onToggle={(e) => onComplete(task, e)}
           size="sm"
           className="mt-0.5"
+          disabled={!canWrite}
+          disabledReason="Your role is read-only for tasks"
         />
 
         <div className="min-w-0 flex-1">
@@ -202,32 +210,39 @@ function TaskCard({ task, isDragging = false, onStatusChange, onComplete }: Task
       </div>
 
       {/* Hover chrome. Also revealed by :focus-within, so the status select
-          below stays reachable by keyboard without cluttering the resting card. */}
-      <div className="row-actions absolute right-1.5 top-1.5 flex items-center gap-1">
-        <select
-          value={task.status}
-          onChange={(e) => onStatusChange(taskId, e.target.value as TaskStatus)}
-          aria-label="Move task to status"
-          onClick={(e) => e.stopPropagation()}
-          className="h-6 rounded border border-border/60 bg-card px-1 text-[10px] text-muted-foreground outline-none focus:border-primary/50"
-        >
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+          below stays reachable by keyboard without cluttering the resting card.
 
-        <button
-          {...listeners}
-          {...attributes}
-          className="flex h-6 w-6 cursor-grab items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:cursor-grabbing"
-          title="Drag to move"
-          aria-label="Drag to move"
-        >
-          <GripVertical size={13} />
-        </button>
-      </div>
+          Both controls here write (PATCH /tasks/:id), so the whole cluster is
+          omitted for a read-only role. Leaving the drag handle in place would be
+          the worst version: the card follows the cursor, drops into the new
+          column, and then snaps back when the request 403s. */}
+      {canWrite && (
+        <div className="row-actions absolute right-1.5 top-1.5 flex items-center gap-1">
+          <select
+            value={task.status}
+            onChange={(e) => onStatusChange(taskId, e.target.value as TaskStatus)}
+            aria-label="Move task to status"
+            onClick={(e) => e.stopPropagation()}
+            className="h-6 rounded border border-border/60 bg-card px-1 text-[10px] text-muted-foreground outline-none focus:border-primary/50"
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          <button
+            {...listeners}
+            {...attributes}
+            className="flex h-6 w-6 cursor-grab items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:cursor-grabbing"
+            title="Drag to move"
+            aria-label="Drag to move"
+          >
+            <GripVertical size={13} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -247,6 +262,8 @@ function BoardColumn({ column, tasks, onStatusChange, onComplete, onAdd }: Board
     id: column.key,
     data: { status: column.key },
   });
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.TASKS_WRITE);
 
   return (
     <div className="flex w-[300px] min-w-[300px] flex-shrink-0 flex-col">
@@ -262,14 +279,16 @@ function BoardColumn({ column, tasks, onStatusChange, onComplete, onAdd }: Board
           </span>
         </div>
 
-        <button
-          onClick={() => onAdd(column.key)}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
-          title={`Add task to ${column.title}`}
-          aria-label={`Add task to ${column.title}`}
-        >
-          <Plus size={14} />
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => onAdd(column.key)}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
+            title={`Add task to ${column.title}`}
+            aria-label={`Add task to ${column.title}`}
+          >
+            <Plus size={14} />
+          </button>
+        )}
       </div>
 
       <div
@@ -293,17 +312,21 @@ function BoardColumn({ column, tasks, onStatusChange, onComplete, onAdd }: Board
 
         {tasks.length === 0 && (
           <div className="mt-1 flex h-20 items-center justify-center rounded-lg border border-dashed border-border/60">
-            <span className="text-[11px] text-muted-foreground">Drop a task here</span>
+            <span className="text-[11px] text-muted-foreground">
+              {canWrite ? 'Drop a task here' : 'No tasks'}
+            </span>
           </div>
         )}
 
-        <button
-          onClick={() => onAdd(column.key)}
-          className="mt-auto flex items-center justify-center gap-1 rounded-lg border border-dashed border-border/60 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-border hover:bg-card hover:text-foreground"
-        >
-          <Plus size={12} />
-          Add task
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => onAdd(column.key)}
+            className="mt-auto flex items-center justify-center gap-1 rounded-lg border border-dashed border-border/60 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:border-border hover:bg-card hover:text-foreground"
+          >
+            <Plus size={12} />
+            Add task
+          </button>
+        )}
       </div>
     </div>
   );
@@ -372,6 +395,13 @@ export default function TasksPage() {
   const updateTaskMutation = useUpdateTask();
   const completeTaskMutation = useCompleteTask();
   const deleteTaskMutation = useDeleteTask();
+
+  // Mirrors tasks.routes.js: read is open to every role, POST/PATCH need
+  // member+, DELETE needs manager+. A viewer used to get the full set of
+  // controls and a 403 toast on every one of them.
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.TASKS_WRITE);
+  const canDelete = can(PERMISSIONS.TASKS_DELETE);
 
   const tasks = data?.tasks || [];
   const total = data?.total || 0;
@@ -495,6 +525,8 @@ export default function TasksPage() {
         <TaskCheckbox
           checked={row.status === 'Done'}
           onToggle={(e) => handleToggleComplete(row, e)}
+          disabled={!canWrite}
+          disabledReason="Your role is read-only for tasks"
         />
       ),
     },
@@ -639,10 +671,12 @@ export default function TasksPage() {
                 Overdue
               </button>
 
-              <Button onClick={() => openAddModal('Open')}>
-                <Plus size={15} />
-                <span className="hidden sm:inline">Add Task</span>
-              </Button>
+              {canWrite && (
+                <Button onClick={() => openAddModal('Open')}>
+                  <Plus size={15} />
+                  <span className="hidden sm:inline">Add Task</span>
+                </Button>
+              )}
             </>
           }
         />
@@ -659,10 +693,12 @@ export default function TasksPage() {
               {selectedIds.length} selected
             </span>
             <div className="flex items-center gap-2">
-              <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
-                <Trash2 size={13} />
-                Delete
-              </Button>
+              {canDelete && (
+                <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                  <Trash2 size={13} />
+                  Delete
+                </Button>
+              )}
               <button
                 type="button"
                 onClick={() => setSelectedIds([])}
@@ -678,11 +714,14 @@ export default function TasksPage() {
         {/* ── Main Content ──────────────────────────────────────────────────── */}
         <div className="mt-4 flex flex-1 flex-col">
           {viewMode === 'list' ? (
+            /* `selectable` follows the delete permission: row selection exists
+               only to feed the bulk-delete bar, so without it a viewer would tick
+               rows and get a selection count with nothing to do. */
             <DataTable
               columns={columns}
               data={tasks}
               isLoading={isLoading}
-              selectable
+              selectable={canDelete}
               selectedIds={selectedIds}
               onSelectRow={handleSelectRow}
               onSelectAll={handleSelectAll}
@@ -696,23 +735,32 @@ export default function TasksPage() {
                 totalPages: Math.ceil(total / 200) || 1,
                 onPageChange: (p) => setPage(p),
               }}
-              rowActions={(row) => (
-                <RowAction
-                  icon={<Trash2 size={14} />}
-                  label="Delete task"
-                  tone="destructive"
-                  onClick={() => handleDeleteOne(row)}
-                />
-              )}
+              rowActions={
+                canDelete
+                  ? // Annotated because the ternary costs the parameter its
+                    // contextual type — without it `row` infers as `{ id: string }`
+                    // and generic inference on DataTable picks the wrong T.
+                    (row: TaskItem) => (
+                      <RowAction
+                        icon={<Trash2 size={14} />}
+                        label="Delete task"
+                        tone="destructive"
+                        onClick={() => handleDeleteOne(row)}
+                      />
+                    )
+                  : undefined
+              }
               emptyIcon={<CheckSquare size={22} />}
               emptyTitle={isFiltered ? 'No matching tasks' : 'Nothing on the list'}
               emptyMessage={
                 isFiltered
                   ? 'Try loosening your filters — nothing matches this combination right now.'
-                  : 'Add a task to keep follow-ups and deal milestones from slipping.'
+                  : canWrite
+                    ? 'Add a task to keep follow-ups and deal milestones from slipping.'
+                    : 'Nothing has been assigned yet. Your role can view tasks but not create them.'
               }
               emptyAction={
-                isFiltered ? undefined : (
+                isFiltered || !canWrite ? undefined : (
                   <Button onClick={() => openAddModal('Open')}>
                     <Plus size={15} />
                     Add your first task

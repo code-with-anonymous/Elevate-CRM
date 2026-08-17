@@ -13,10 +13,15 @@ import {
   DollarSign,
   Plus,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import StatusBadge from '@/components/common/StatusBadge';
 import AvatarWithInitials from '@/components/common/AvatarWithInitials';
+import AIEmailModal from '@/components/leads/AIEmailModal';
+import LeadAISummaryDrawer from '@/components/leads/LeadAISummaryDrawer';
 import { useLead, useUpdateLead, useDeleteLead } from '@/hooks/useLeads';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/constants/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '@/services/api/axiosInstance';
 import dayjs from 'dayjs';
@@ -36,10 +41,22 @@ export default function LeadDetailPage() {
   const [newTaskPriority, setNewTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [addingTask, setAddingTask] = useState(false);
 
+  // AI surfaces — same two components the leads table mounts. The lead object is
+  // the open/closed flag; null means closed.
+  const [aiLead, setAiLead] = useState<any>(null);
+  const [emailLead, setEmailLead] = useState<any>(null);
+
   // Queries & Mutations
   const { data: leadData, isLoading, isError } = useLead(id || '');
   const updateLeadMutation = useUpdateLead();
   const deleteLeadMutation = useDeleteLead();
+
+  // The quick-add-task form on this page writes to /api/tasks, which has its own
+  // guard, so it needs tasks:write rather than leads:write.
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.LEADS_WRITE);
+  const canDelete = can(PERMISSIONS.LEADS_DELETE);
+  const canWriteTasks = can(PERMISSIONS.TASKS_WRITE);
 
   const lead = leadData?.lead || leadData;
   const tasks = leadData?.tasks || [];
@@ -163,26 +180,47 @@ export default function LeadDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleSave}
-            disabled={updateLeadMutation.isPending}
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-500 px-4 text-xs font-semibold text-white shadow-sm hover:bg-blue-600 active:scale-[0.98]"
-          >
-            {updateLeadMutation.isPending ? (
-              <Loader2 className="animate-spin" size={14} />
-            ) : (
-              <Save size={14} />
-            )}
-            Save Changes
-          </button>
+          {/* Hand-rolled to match its siblings below rather than importing the
+              shared Button — this page uses no design-system primitives, and one
+              odd button out reads worse than matching the local style.
 
-          <button
-            onClick={() => setConfirmDelete(true)}
-            className="flex h-9 items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 text-xs font-semibold text-destructive hover:bg-destructive/20"
-          >
-            <Trash2 size={14} />
-            Delete
-          </button>
+              A read-only role keeps the page and loses this whole cluster: the
+              detail view itself is an ungated GET, so a viewer should still be
+              able to read a lead. */}
+          {canWrite && (
+            <button
+              onClick={() => setAiLead(lead)}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 active:scale-[0.98]"
+            >
+              <Sparkles size={14} />
+              AI Summary
+            </button>
+          )}
+
+          {canWrite && (
+            <button
+              onClick={handleSave}
+              disabled={updateLeadMutation.isPending}
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-500 px-4 text-xs font-semibold text-white shadow-sm hover:bg-blue-600 active:scale-[0.98]"
+            >
+              {updateLeadMutation.isPending ? (
+                <Loader2 className="animate-spin" size={14} />
+              ) : (
+                <Save size={14} />
+              )}
+              Save Changes
+            </button>
+          )}
+
+          {canDelete && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 text-xs font-semibold text-destructive hover:bg-destructive/20"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -194,7 +232,19 @@ export default function LeadDetailPage() {
             Lead Details
           </h2>
 
-          <div className="space-y-4 text-xs">
+          {!canWrite && (
+            <p className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-2 text-[11px] text-muted-foreground">
+              Your role has read-only access to leads. These fields can be viewed
+              but not changed.
+            </p>
+          )}
+
+          {/* A <fieldset disabled> rather than a `disabled` prop on each of the
+              eight controls: the browser disables every descendant for free, and
+              adding a ninth field later can't forget the gate. `min-w-0` because
+              a fieldset defaults to `min-width: min-content`, which would stop
+              the grid children from shrinking. */}
+          <fieldset disabled={!canWrite} className="min-w-0 space-y-4 text-xs">
             {/* First Name & Last Name */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -311,7 +361,7 @@ export default function LeadDetailPage() {
                 className="mt-1 h-8 w-full rounded-md border border-border bg-background px-2.5 text-xs outline-none focus:border-blue-500"
               />
             </div>
-          </div>
+          </fieldset>
         </div>
 
         {/* Right Column: Tabs (Timeline | Tasks | Notes) */}
@@ -388,32 +438,36 @@ export default function LeadDetailPage() {
 
             {activeTab === 'tasks' && (
               <div className="space-y-5">
-                {/* Quick Add Task Form */}
-                <form onSubmit={handleAddTask} className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Add a new task for this lead..."
-                    value={newTaskTitle}
-                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                    className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-blue-500"
-                  />
-                  <select
-                    value={newTaskPriority}
-                    onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                    className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-medium outline-none"
-                  >
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
-                  <button
-                    type="submit"
-                    disabled={addingTask}
-                    className="flex h-9 items-center gap-1 rounded-lg bg-blue-500 px-3 text-xs font-semibold text-white hover:bg-blue-600"
-                  >
-                    <Plus size={14} /> Add
-                  </button>
-                </form>
+                {/* Quick Add Task Form — gated on tasks:write, not leads:write,
+                    because it POSTs to /api/tasks. A manager-less member can
+                    still add tasks here even where they can't delete the lead. */}
+                {canWriteTasks && (
+                  <form onSubmit={handleAddTask} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Add a new task for this lead..."
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-blue-500"
+                    />
+                    <select
+                      value={newTaskPriority}
+                      onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                      className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-medium outline-none"
+                    >
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={addingTask}
+                      className="flex h-9 items-center gap-1 rounded-lg bg-blue-500 px-3 text-xs font-semibold text-white hover:bg-blue-600"
+                    >
+                      <Plus size={14} /> Add
+                    </button>
+                  </form>
+                )}
 
                 {/* Tasks List */}
                 <div className="space-y-2">
@@ -452,18 +506,25 @@ export default function LeadDetailPage() {
                   rows={6}
                   value={formData.notes}
                   onChange={handleChange}
-                  placeholder="Add internal notes about this lead..."
-                  className="w-full rounded-lg border border-border bg-background p-3 text-xs outline-none focus:border-blue-500"
+                  disabled={!canWrite}
+                  placeholder={
+                    canWrite
+                      ? 'Add internal notes about this lead...'
+                      : 'No notes recorded.'
+                  }
+                  className="w-full rounded-lg border border-border bg-background p-3 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
                 />
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleSave}
-                    disabled={updateLeadMutation.isPending}
-                    className="flex h-8 items-center gap-1.5 rounded-lg bg-blue-500 px-3 text-xs font-semibold text-white hover:bg-blue-600"
-                  >
-                    <Save size={12} /> Save Notes
-                  </button>
-                </div>
+                {canWrite && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSave}
+                      disabled={updateLeadMutation.isPending}
+                      className="flex h-8 items-center gap-1.5 rounded-lg bg-blue-500 px-3 text-xs font-semibold text-white hover:bg-blue-600"
+                    >
+                      <Save size={12} /> Save Notes
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -495,6 +556,17 @@ export default function LeadDetailPage() {
           </div>
         </div>
       )}
+
+      <LeadAISummaryDrawer
+        lead={aiLead}
+        onClose={() => setAiLead(null)}
+        onGenerateEmail={(l) => {
+          setAiLead(null);
+          setEmailLead(l);
+        }}
+      />
+
+      <AIEmailModal lead={emailLead} onClose={() => setEmailLead(null)} />
     </div>
   );
 }

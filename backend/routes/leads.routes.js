@@ -14,6 +14,7 @@
 const { Router } = require('express');
 const { verifyToken } = require('../middleware/auth');
 const { requireMinRole } = require('../middleware/rbac');
+const { aiLimiter } = require('../middleware/rateLimiter');
 const ctrl = require('../controllers/leads.controller');
 
 const router = Router();
@@ -30,5 +31,11 @@ router.get('/:id', ctrl.getLeadById);
 router.patch('/:id', canWrite, ctrl.updateLead);
 router.delete('/:id', canDelete, ctrl.deleteLead);
 router.patch('/:id/status', canWrite, ctrl.updateLeadStatus);
+
+// AI generation — write-gated rather than read-gated, because a viewer should
+// not be able to spend paid Gemini quota. aiLimiter is per-user and sits after
+// the router-wide verifyToken, so req.user.sub is populated when it keys.
+router.post('/:id/ai-summary', canWrite, aiLimiter, ctrl.getLeadAISummary);
+router.post('/:id/ai-email', canWrite, aiLimiter, ctrl.generateLeadEmail);
 
 module.exports = router;

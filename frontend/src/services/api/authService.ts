@@ -6,6 +6,8 @@ import axiosInstance from './axiosInstance';
 import { API_ENDPOINTS } from '@constants/index';
 import type {
   AuthResponse,
+  Organization,
+  User,
   LoginPayload,
   RegisterPayload,
   ResetPasswordPayload,
@@ -28,6 +30,13 @@ interface ValidateResetTokenResponse {
   isValid: boolean;
   email?: string;
   expiresAt?: string;
+}
+
+/** POST /auth/refresh — tokens, plus the server's current view of the user. */
+export interface RefreshResponse {
+  tokens: { accessToken: string; expiresIn: number };
+  user?: User;
+  organization?: Organization;
 }
 
 // ── Auth Service ──────────────────────────────────────────────────────────────
@@ -96,9 +105,17 @@ const authService = {
   /**
    * Silent token refresh using httpOnly refresh cookie
    * POST /auth/refresh
+   *
+   * Returns the current user and organization as well as the tokens. Callers
+   * should prefer these over any locally persisted copy — this response is the
+   * only point in a page-reload bootstrap where the server gets to correct a
+   * role that changed (or was tampered with) since the session started.
+   *
+   * Typed optional because a deployed backend older than this change sends
+   * tokens only; useRefreshSession falls back to the persisted user in that case.
    */
-  refreshToken: async (): Promise<{ tokens: { accessToken: string; expiresIn: number } }> => {
-    const response = await axiosInstance.post<Envelope<{ tokens: { accessToken: string; expiresIn: number } }>>(
+  refreshToken: async (): Promise<RefreshResponse> => {
+    const response = await axiosInstance.post<Envelope<RefreshResponse>>(
       API_ENDPOINTS.AUTH.REFRESH
     );
     return response.data.data;

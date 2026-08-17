@@ -18,6 +18,7 @@ const LoginHistory    = require('../models/LoginHistory');
 const ApiError        = require('../utils/ApiError');
 const tokenService    = require('./token.service');
 const emailService    = require('./email.service');
+const { derivePermissions, roleLevel, normalizeRole } = require('../config/permissions');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -36,7 +37,10 @@ function buildTokenPair(user) {
     sub:            user._id.toString(),
     role:           user.role,
     organizationId: user.organizationId.toString(),
-    permissions:    user.permissions,
+    // Derived, not `user.permissions` — that array is empty on every user in the
+    // database, so signing it verbatim is what made requirePermission() deny
+    // everyone. See config/permissions.js.
+    permissions:    derivePermissions(user),
   };
   const accessToken  = tokenService.generateAccessToken(payload);
   const refreshToken = tokenService.generateRefreshToken({ sub: user._id.toString() });
@@ -85,8 +89,13 @@ function formatUser(user, org) {
       firstName:       user.firstName,
       lastName:        user.lastName,
       avatarUrl:       user.avatarUrl,
-      role:            user.role.toUpperCase(),    
-      permissions:     user.permissions,
+      // UPPERCASE to match the frontend UserRole enum; the store re-normalises
+      // anyway, but sending the shape the client's type claims avoids a third
+      // place where 'owner' vs 'OWNER' has to be remembered.
+      role:            String(user.role || 'viewer').toUpperCase(),
+      // Same derivation as the JWT, so `can()` on the client and
+      // requirePermission() on the server always agree about one user.
+      permissions:     derivePermissions(user),
       isEmailVerified: user.isEmailVerified,
       is2FAEnabled:    user.is2FAEnabled,
       twoFactorMethod: user.is2FAEnabled ? 'AUTHENTICATOR' : null,
@@ -504,7 +513,18 @@ async function refreshTokens(rawRefreshToken, req) {
   const { accessToken, refreshToken: newRefreshToken } = buildTokenPair(user);
   await tokenService.saveRefreshToken(user._id, newRefreshToken, req);
 
+  // The fresh user and org go back to the caller, not just the tokens.
+  //
+  // They were already loaded here and then dropped, which forced the client to
+  // re-apply the `user` it had persisted in sessionStorage across a reload. Two
+  // consequences: a role change never reached the UI (the server issued a token
+  // saying `member` while the interface kept rendering the admin controls from
+  // the stale copy), and sessionStorage is user-writable, so editing `role` to
+  // OWNER there unlocked every gated control in the app. The server 403s on the
+  // actual requests, so it was never a real privilege escalation — it just made
+  // RBAC look broken from both directions.
   return {
+    ...formatUser(user, org),
     accessToken,
     expiresIn:      tokenService.parseExpiresIn(env.ACCESS_TOKEN_EXPIRES),
     rawRefreshToken: newRefreshToken,

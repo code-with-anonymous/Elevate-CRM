@@ -21,9 +21,35 @@ const usdCompact = new Intl.NumberFormat('en-US', {
 
 const decimal = new Intl.NumberFormat('en-US');
 
+/**
+ * Same idea as `usd` but for records that carry their own currency (deals do).
+ * Cached per code because a kanban board renders hundreds of these per paint.
+ */
+const byCurrency = new Map<string, Intl.NumberFormat>();
+
 /** $1,240,000 — full precision, for cards where the exact figure matters. */
 export function formatCurrency(value: number | null | undefined): string {
   return usd.format(value ?? 0);
+}
+
+/** formatCurrency for a record that stores its own currency code. */
+export function formatMoney(value: number | null | undefined, currency = 'USD'): string {
+  let formatter = byCurrency.get(currency);
+  if (!formatter) {
+    try {
+      formatter = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 0,
+      });
+    } catch {
+      // Intl throws RangeError on a malformed code. One bad row must not take
+      // down a board that renders hundreds of these.
+      formatter = usd;
+    }
+    byCurrency.set(currency, formatter);
+  }
+  return formatter.format(value ?? 0);
 }
 
 /** $1.2M — for tight spaces and axis labels. */

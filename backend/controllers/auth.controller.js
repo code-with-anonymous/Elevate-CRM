@@ -6,7 +6,9 @@
 const authService   = require('../services/auth.service');
 const tokenService  = require('../services/token.service');
 const ApiResponse   = require('../utils/ApiResponse');
+const ApiError      = require('../utils/ApiError');
 const asyncHandler  = require('../utils/asyncHandler');
+const { normalizeRole, roleLevel } = require('../config/permissions');
 
 // ── POST /auth/register ───────────────────────────────────────────────────────
 const register = asyncHandler(async (req, res) => {
@@ -78,7 +80,12 @@ const refresh = asyncHandler(async (req, res) => {
 
   tokenService.setRefreshCookie(res, result.rawRefreshToken);
 
+  // user/organization are returned alongside the tokens so the client rebuilds
+  // its auth state from the server on every session bootstrap instead of
+  // trusting the copy it persisted in sessionStorage. See refreshTokens().
   return ApiResponse.ok(res, 'Token refreshed', {
+    user:         result.user,
+    organization: result.organization,
     tokens: {
       accessToken: result.accessToken,
       expiresIn:   result.expiresIn,
@@ -169,23 +176,58 @@ const disable2FA = asyncHandler(async (req, res) => {
 });
 
 // ── POST /auth/invite  [protected, role: owner|admin] ────────────────────────
+//
+// requireRole('owner','admin') on the route decides WHO may invite. It does not
+// decide WHAT ROLE they may hand out, and that gap was an escalation: the body
+// validator accepted 'owner', so an admin could invite a second owner — or
+// another admin — and quietly acquire a peer who outranks the people who could
+// remove them. team.controller.js already refuses to *promote* to at-or-above
+// your own level; inviting was the same grant through a different door.
+//
+// The level check is made against the inviter's role as stored in the database,
+// not the role claim in their token, so a stale token can't widen it.
 const inviteMember = asyncHandler(async (req, res) => {
   const { email, role } = req.body;
   const { sub: invitedBy, organizationId } = req.user;
 
-  // Fetch inviter's name for the email
   const User = require('../models/User');
   const Organization = require('../models/Organization');
-  const inviter = await User.findById(invitedBy);
-  const org     = await Organization.findById(organizationId);
+  const [inviter, org] = await Promise.all([
+    User.findById(invitedBy).select('firstName lastName role'),
+    Organization.findById(organizationId).select('name'),
+  ]);
+
+  // Their own account was deleted or suspended between issuing the token and
+  // this request — 401 rather than crash on `inviter.firstName`.
+  if (!inviter) {
+    throw ApiError.unauthorized('Your account is no longer available', 'USER_INACTIVE');
+  }
+
+  const requestedRole = normalizeRole(role || 'member');
+
+  if (requestedRole === 'owner') {
+    // Ownership transfer has to move Organization.ownerId too, so it needs its
+    // own endpoint — it cannot ride in on an invitation.
+    throw ApiError.badRequest(
+      'An organisation owner cannot be invited. Transfer ownership instead.',
+      'INVALID_ROLE'
+    );
+  }
+
+  if (roleLevel(requestedRole) >= roleLevel(inviter.role)) {
+    throw ApiError.forbidden(
+      'You cannot invite someone at or above your own level',
+      'INSUFFICIENT_ROLE'
+    );
+  }
 
   await authService.inviteMember(
     organizationId,
     invitedBy,
     email,
-    role || 'member',
+    requestedRole,
     `${inviter.firstName} ${inviter.lastName}`,
-    org.name
+    org ? org.name : 'your organisation'
   );
 
   return res.status(201).json({ success: true, message: 'Invitation sent successfully.' });

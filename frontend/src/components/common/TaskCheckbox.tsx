@@ -16,6 +16,14 @@ interface TaskCheckboxProps {
   onToggle: (e: React.MouseEvent) => void;
   size?: 'sm' | 'md';
   className?: string;
+  /**
+   * Ticking a box is a PATCH /tasks/:id/complete, which needs member+ on the
+   * server. Disabled rather than hidden: the tick is also how you read whether a
+   * task is done, so a viewer still needs to see its state.
+   */
+  disabled?: boolean;
+  /** Replaces the title/aria-label when disabled — says which rule applies. */
+  disabledReason?: string;
 }
 
 export default function TaskCheckbox({
@@ -23,17 +31,21 @@ export default function TaskCheckbox({
   onToggle,
   size = 'md',
   className,
+  disabled = false,
+  disabledReason,
 }: TaskCheckboxProps) {
   const box = size === 'sm' ? 'h-4 w-4' : 'h-[18px] w-[18px]';
+  const label = checked ? 'Mark incomplete' : 'Mark complete';
 
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={checked}
-      aria-label={checked ? 'Mark incomplete' : 'Mark complete'}
-      title={checked ? 'Mark incomplete' : 'Mark complete'}
-      onClick={onToggle}
+      aria-label={disabled ? (disabledReason ?? label) : label}
+      title={disabled ? (disabledReason ?? label) : label}
+      onClick={disabled ? undefined : onToggle}
+      disabled={disabled}
       className={cn(
         'flex shrink-0 items-center justify-center rounded-[6px] border',
         'transition-colors duration-150',
@@ -41,7 +53,9 @@ export default function TaskCheckbox({
         box,
         checked
           ? 'border-status-positive bg-status-positive text-white'
-          : 'border-border bg-background hover:border-status-positive/60',
+          : 'border-border bg-background',
+        !disabled && !checked && 'hover:border-status-positive/60',
+        disabled && 'cursor-not-allowed opacity-60',
         className
       )}
     >

@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { AuthStore, User, Organization, UserRole } from '@/types/auth';
 import { STORAGE_KEYS } from '@constants/index';
+import { permissionsForRole } from '@constants/permissions';
 
 // ── Persisted State (sessionStorage) ──────────────────────────────────────────
 // Only user + org data are persisted. Access token stays in memory ONLY.
@@ -76,7 +77,10 @@ export const useAuthStore = create<AuthStoreInternal>()(
           accessToken: token, // memory only
           isAuthenticated: true,
           isLoading: false,
-          permissions: user.permissions,
+          // `?? []` rather than trusting the field: an older backend, or the
+          // Google login path, can omit it, and `undefined.includes` in
+          // hasPermission would take the whole app down.
+          permissions: user.permissions ?? [],
           role: normalizeRole(user.role),
           sessionExpiry: expiry,
           pendingTwoFactor: false,
@@ -126,10 +130,18 @@ export const useAuthStore = create<AuthStoreInternal>()(
       },
 
       /**
-       * Check if user has a specific permission
+       * Check if user has a specific permission.
+       *
+       * `permissions` comes from the server. When it's empty we fall back to
+       * what the role grants rather than answering false: an empty list used to
+       * mean every `can()` check failed, which would hide every gated control
+       * from an owner. Sessions started before the server began sending derived
+       * permissions have exactly that empty array persisted.
        */
       hasPermission: (permission: string): boolean => {
-        return get().permissions.includes(permission);
+        const { permissions, role } = get();
+        if (permissions.length > 0) return permissions.includes(permission);
+        return (permissionsForRole(role) as readonly string[]).includes(permission);
       },
 
       /**

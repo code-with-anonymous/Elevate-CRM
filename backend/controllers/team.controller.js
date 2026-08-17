@@ -108,6 +108,14 @@ const updateMemberRole = asyncHandler(async (req, res) => {
   target.role = role;
   await target.save();
 
+  // The role lives in their ACCESS TOKEN, so writing the database alone does not
+  // demote anyone — they keep the old claim until that token expires, and until
+  // now they could hand their refresh token back and be reissued the OLD role
+  // indefinitely. Revoking the refresh tokens closes that: the demotion is
+  // final after at most one access-token lifetime, and their next refresh is a
+  // 401 that sends them back through login.
+  await tokenService.revokeAllUserTokens(target._id);
+
   return ApiResponse.ok(res, 'Role updated', {
     id: target._id.toString(),
     role: target.role,
@@ -137,6 +145,9 @@ const removeMember = asyncHandler(async (req, res) => {
     target.isActive = false;
     await target.save();
     await Organization.findByIdAndUpdate(req.organizationId, { $inc: { memberCount: -1 } });
+    // refreshTokens() already refuses an inactive user, but revoking is what
+    // makes "removed" mean removed rather than "removed at their next login".
+    await tokenService.revokeAllUserTokens(target._id);
   }
 
   return ApiResponse.ok(res, 'Member removed', { id: target._id.toString() });

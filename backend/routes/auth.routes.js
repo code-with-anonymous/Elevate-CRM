@@ -207,8 +207,11 @@ router.post(
   requireRole('owner', 'admin'),
   [
     body('email').trim().isEmail().withMessage('Valid email is required').normalizeEmail(),
-    body('role').optional().isIn(['owner', 'admin', 'manager', 'member', 'viewer'])
-      .withMessage('Invalid role'),
+    // 'owner' removed: ownership is transferred, never invited. The controller
+    // additionally refuses any role at or above the inviter's own level, which
+    // a static list here cannot express.
+    body('role').optional().isIn(['admin', 'manager', 'member', 'viewer'])
+      .withMessage('Role must be admin, manager, member, or viewer'),
   ],
   validate,
   ctrl.inviteMember

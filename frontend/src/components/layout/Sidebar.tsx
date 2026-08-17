@@ -21,6 +21,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { ROUTES } from '@/constants';
+import { PERMISSIONS, type Permission } from '@/constants/permissions';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/cn';
 import { DURATION, EASE_OUT } from '@/lib/motion';
@@ -32,6 +34,15 @@ interface NavItem {
   icon: ReactNode;
   path: string;
   badge?: number;
+  /**
+   * Permission required to see this item. Omit for items every authenticated
+   * role can reach.
+   *
+   * Without this, Reports sat in the rail for viewers and members, whose only
+   * feedback on clicking it was the Access Denied page — the route guard was
+   * doing its job, but offering the door at all was the bug.
+   */
+  permission?: Permission;
 }
 
 const ICON = 19;
@@ -48,7 +59,14 @@ const NAV_ITEMS: NavItem[] = [
   // single-row TeamsPage from before the team API existed. /settings/team is the
   // real one — roles, invites, removal, all server-enforced.
   { label: 'Team', icon: <UsersRound size={ICON} />, path: ROUTES.SETTINGS.TEAM },
-  { label: 'Reports', icon: <BarChart3 size={ICON} />, path: ROUTES.REPORTS },
+  // Mirrors requireMinRole('manager') on /api/reports/* and the RoleRoute on
+  // /reports. Three places agree on one rule; the server is the one that counts.
+  {
+    label: 'Reports',
+    icon: <BarChart3 size={ICON} />,
+    path: ROUTES.REPORTS,
+    permission: PERMISSIONS.REPORTS_READ,
+  },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
@@ -122,6 +140,12 @@ function RailLink({ item, active }: { item: NavItem; active: boolean }) {
 export default function Sidebar() {
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
+  const { can } = usePermissions();
+
+  const navItems = useMemo(
+    () => NAV_ITEMS.filter((item) => !item.permission || can(item.permission)),
+    [can]
+  );
 
   // Longest match wins, and only one item is ever active.
   //
@@ -135,11 +159,11 @@ export default function Sidebar() {
   // highlighted.
   const activePath = useMemo(() => {
     const { pathname } = location;
-    return [...NAV_ITEMS, ...BOTTOM_ITEMS]
+    return [...navItems, ...BOTTOM_ITEMS]
       .map((item) => item.path)
       .filter((path) => pathname === path || pathname.startsWith(`${path}/`))
       .sort((a, b) => b.length - a.length)[0];
-  }, [location]);
+  }, [location, navItems]);
 
   const isActive = (path: string): boolean => path === activePath;
 
@@ -155,7 +179,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col items-center gap-1">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <RailLink key={item.path} item={item} active={isActive(item.path)} />
         ))}
       </nav>

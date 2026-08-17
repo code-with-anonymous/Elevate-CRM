@@ -7,6 +7,7 @@ const ApiResponse = require('../utils/ApiResponse');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { escapeRegex } = require('../utils/escapeRegex');
+const aiService = require('../services/ai.service');
 
 // GET /api/leads
 const getLeads = asyncHandler(async (req, res) => {
@@ -249,6 +250,69 @@ const updateLeadStatus = asyncHandler(async (req, res) => {
   return ApiResponse.ok(res, 'Lead status updated successfully', updatedLead);
 });
 
+// ── AI ────────────────────────────────────────────────────────────────────────
+// Both handlers load the lead with the SAME tenancy filter as every read above.
+// A bare findById here would not just be a cross-tenant read — it would ship
+// another organisation's lead notes to Google.
+
+/**
+ * Loads a lead for an AI route, or throws.
+ * Rejects before spending a Gemini call when the server has no key configured.
+ */
+async function loadLeadForAI(req) {
+  const lead = await Lead.findOne({
+    _id: req.params.id,
+    organizationId: req.organizationId,
+    isDeleted: { $ne: true },
+  });
+
+  if (!lead) {
+    throw ApiError.notFound('Lead not found');
+  }
+
+  if (!aiService.hasGeminiConfig()) {
+    throw new ApiError(
+      503,
+      'AI features are not configured on this server.',
+      'AI_NOT_CONFIGURED'
+    );
+  }
+
+  return lead;
+}
+
+// POST /api/leads/:id/ai-summary
+const getLeadAISummary = asyncHandler(async (req, res) => {
+  const lead = await loadLeadForAI(req);
+  const summary = await aiService.generateLeadSummary(lead);
+
+  return ApiResponse.ok(res, 'Lead summary generated successfully', summary);
+});
+
+// POST /api/leads/:id/ai-email
+const generateLeadEmail = asyncHandler(async (req, res) => {
+  const { purpose, tone } = req.body;
+
+  // Allowlist keys, not free text. `purpose` and `tone` are interpolated into
+  // the instruction position of the prompt, so accepting arbitrary strings here
+  // would hand the caller the system prompt. Validate before loading anything.
+  if (!Object.hasOwn(aiService.EMAIL_PURPOSES, purpose || '')) {
+    throw ApiError.badRequest('Invalid email purpose', 'INVALID_PURPOSE');
+  }
+
+  if (!Object.hasOwn(aiService.EMAIL_TONES, tone || '')) {
+    throw ApiError.badRequest('Invalid email tone', 'INVALID_TONE');
+  }
+
+  const lead = await loadLeadForAI(req);
+
+  // Sender identity comes from the token, never the request body.
+  const sender = await User.findById(req.user.sub).select('firstName lastName');
+  const email = await aiService.generateLeadEmail(lead, { purpose, tone }, sender || {});
+
+  return ApiResponse.ok(res, 'Email drafted successfully', email);
+});
+
 // GET /api/leads/users
 const getOrgUsers = asyncHandler(async (req, res) => {
   const users = await User.find({ organizationId: req.organizationId }).select(
@@ -265,4 +329,6 @@ module.exports = {
   deleteLead,
   updateLeadStatus,
   getOrgUsers,
+  getLeadAISummary,
+  generateLeadEmail,
 };

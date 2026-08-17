@@ -76,8 +76,22 @@ export function useRefreshSession() {
   const refreshSession = useCallback(async (): Promise<boolean> => {
     try {
       const data = await authService.refreshToken();
-      if (user && organization) {
-        setAuth(user, data.tokens.accessToken, organization, data.tokens.expiresIn);
+
+      // Prefer the server's copy. This used to unconditionally re-apply the
+      // `user` held in the store — which on a page reload came from
+      // sessionStorage — so the role the UI gated on was whatever was persisted
+      // when the session started, not what the server believes now. A role
+      // changed by an admin never reached the interface, and hand-editing
+      // sessionStorage unlocked gated controls (the requests still 403'd).
+      //
+      // The fallback covers a backend older than the change that added these
+      // fields; it is the previous behaviour, kept only so a version skew
+      // degrades to a stale role rather than a logout.
+      const nextUser = data.user ?? user;
+      const nextOrg = data.organization ?? organization;
+
+      if (nextUser && nextOrg) {
+        setAuth(nextUser, data.tokens.accessToken, nextOrg, data.tokens.expiresIn);
         return true;
       }
       return false;

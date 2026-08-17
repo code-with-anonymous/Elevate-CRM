@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, Plus, Trash2, Users, X } from 'lucide-react';
+import { ArrowUpRight, Mail, Plus, Sparkles, Trash2, Users, X } from 'lucide-react';
 import dayjs from 'dayjs';
 import DataTable, { Column, RowAction } from '@/components/common/DataTable';
 import FilterBar from '@/components/common/FilterBar';
@@ -21,9 +21,13 @@ import StatusBadge from '@/components/common/StatusBadge';
 import AvatarWithInitials from '@/components/common/AvatarWithInitials';
 import PageHeader from '@/components/common/PageHeader';
 import AddLeadDrawer from '@/components/leads/AddLeadDrawer';
+import AIEmailModal from '@/components/leads/AIEmailModal';
+import LeadAISummaryDrawer from '@/components/leads/LeadAISummaryDrawer';
 import { Button } from '@/components/ui/button';
 import { selectClass } from '@/components/ui/field';
 import { useDeleteLead, useLeadsList, useUpdateLeadStatus } from '@/hooks/useLeads';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/constants/permissions';
 import { formatCurrency } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { DURATION, EASE_OUT, pageVariants } from '@/lib/motion';
@@ -61,6 +65,11 @@ export default function LeadsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // AI surfaces. The lead itself is the open/closed flag — null means closed —
+  // so the panels always render the row that was clicked, never a stale one.
+  const [aiLead, setAiLead] = useState<any>(null);
+  const [emailLead, setEmailLead] = useState<any>(null);
+
   // Queries & Mutations
   const { data, isLoading } = useLeadsList({
     page,
@@ -74,6 +83,13 @@ export default function LeadsPage() {
 
   const deleteLeadMutation = useDeleteLead();
   const updateStatusMutation = useUpdateLeadStatus();
+
+  // Mirrors leads.routes.js. Note the AI row actions are write-gated, not
+  // read-gated — POST /leads/:id/ai-summary and /ai-email sit behind canWrite so
+  // a viewer can't spend paid Gemini quota, so they follow leads:write here.
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.LEADS_WRITE);
+  const canDelete = can(PERMISSIONS.LEADS_DELETE);
 
   const leads = data?.leads || [];
   const total = data?.total || 0;
@@ -283,10 +299,12 @@ export default function LeadsPage() {
           },
         ]}
         actions={
-          <Button onClick={() => setDrawerOpen(true)}>
-            <Plus size={15} />
-            Add Lead
-          </Button>
+          canWrite ? (
+            <Button onClick={() => setDrawerOpen(true)}>
+              <Plus size={15} />
+              Add Lead
+            </Button>
+          ) : undefined
         }
       />
 
@@ -303,28 +321,32 @@ export default function LeadsPage() {
           </span>
 
           <div className="flex items-center gap-2">
-            <select
-              onChange={(e) => {
-                if (e.target.value) handleBulkStatusChange(e.target.value);
-              }}
-              defaultValue=""
-              aria-label="Change status for selected leads"
-              className={cn(selectClass, 'h-8 w-auto text-xs')}
-            >
-              <option value="" disabled>
-                Change status…
-              </option>
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+            {canWrite && (
+              <select
+                onChange={(e) => {
+                  if (e.target.value) handleBulkStatusChange(e.target.value);
+                }}
+                defaultValue=""
+                aria-label="Change status for selected leads"
+                className={cn(selectClass, 'h-8 w-auto text-xs')}
+              >
+                <option value="" disabled>
+                  Change status…
                 </option>
-              ))}
-            </select>
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            )}
 
-            <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
-              <Trash2 size={13} />
-              Delete
-            </Button>
+            {canDelete && (
+              <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                <Trash2 size={13} />
+                Delete
+              </Button>
+            )}
 
             <button
               type="button"
@@ -343,7 +365,9 @@ export default function LeadsPage() {
           columns={columns}
           data={leads}
           isLoading={isLoading}
-          selectable
+          /* Selection drives two bulk actions with different guards — the status
+             select (write) and Delete (delete) — so it survives if either does. */
+          selectable={canWrite || canDelete}
           selectedIds={selectedIds}
           onSelectRow={handleSelectRow}
           onSelectAll={handleSelectAll}
@@ -360,17 +384,34 @@ export default function LeadsPage() {
           }}
           rowActions={(row) => (
             <>
+              {canWrite && (
+                <>
+                  <RowAction
+                    icon={<Sparkles size={14} />}
+                    label="AI summary"
+                    onClick={() => setAiLead(row)}
+                  />
+                  <RowAction
+                    icon={<Mail size={14} />}
+                    label="Draft AI email"
+                    onClick={() => setEmailLead(row)}
+                  />
+                </>
+              )}
+              {/* Open is the one action every role keeps — reads are ungated. */}
               <RowAction
                 icon={<ArrowUpRight size={14} />}
                 label="Open lead"
                 onClick={() => navigate(`/leads/${row.id || row._id}`)}
               />
-              <RowAction
-                icon={<Trash2 size={14} />}
-                label="Delete lead"
-                tone="destructive"
-                onClick={() => handleDeleteOne(row)}
-              />
+              {canDelete && (
+                <RowAction
+                  icon={<Trash2 size={14} />}
+                  label="Delete lead"
+                  tone="destructive"
+                  onClick={() => handleDeleteOne(row)}
+                />
+              )}
             </>
           )}
           emptyIcon={<Users size={22} />}
@@ -380,10 +421,12 @@ export default function LeadsPage() {
           emptyMessage={
             search || statusFilter || sourceFilter
               ? 'Try loosening your filters — nothing matches this combination right now.'
-              : 'Add your first lead and it will start filling the pipeline immediately.'
+              : canWrite
+                ? 'Add your first lead and it will start filling the pipeline immediately.'
+                : 'No leads have been added yet. Your role can view leads but not create them.'
           }
           emptyAction={
-            search || statusFilter || sourceFilter ? undefined : (
+            search || statusFilter || sourceFilter || !canWrite ? undefined : (
               <Button onClick={() => setDrawerOpen(true)}>
                 <Plus size={15} />
                 Add your first lead
@@ -394,6 +437,19 @@ export default function LeadsPage() {
       </div>
 
       <AddLeadDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      <LeadAISummaryDrawer
+        lead={aiLead}
+        onClose={() => setAiLead(null)}
+        // Close the drawer before opening the modal — both claim z-40/z-50, so
+        // showing them together would stack two scrims.
+        onGenerateEmail={(lead) => {
+          setAiLead(null);
+          setEmailLead(lead);
+        }}
+      />
+
+      <AIEmailModal lead={emailLead} onClose={() => setEmailLead(null)} />
     </motion.div>
   );
 }

@@ -25,6 +25,8 @@ import SegmentedControl from '@/components/ui/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Field, controlClass } from '@/components/ui/field';
 import { useContactsList, useCreateContact, useDeleteContact } from '@/hooks/useContacts';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PERMISSIONS } from '@/constants/permissions';
 import { Contact } from '@/services/api/contactService';
 import { cn } from '@/lib/cn';
 import {
@@ -81,6 +83,11 @@ function ContactCard({
   onDelete: (contact: Contact) => void;
 }) {
   const converted = Boolean(contact.leadId || contact.dealId);
+  // DELETE /api/contacts/:id is manager+. Both controls in the hover chrome
+  // serve deletion — the checkbox only feeds the bulk-delete bar — so the whole
+  // strip is omitted rather than left there to answer 403.
+  const { can } = usePermissions();
+  const canDelete = can(PERMISSIONS.CONTACTS_DELETE);
 
   return (
     <motion.div
@@ -94,24 +101,26 @@ function ContactCard({
       )}
     >
       {/* Hover chrome — select + delete */}
-      <div className="row-actions absolute inset-x-2 top-2 flex items-center justify-between">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={() => onToggleSelect(contact.id)}
-          aria-label={`Select ${contact.firstName} ${contact.lastName}`}
-          className="h-4 w-4 cursor-pointer appearance-none rounded-[5px] border border-border bg-background transition-colors duration-150 checked:border-primary checked:bg-primary hover:border-primary/60"
-        />
-        <button
-          type="button"
-          onClick={() => onDelete(contact)}
-          aria-label="Delete contact"
-          title="Delete contact"
-          className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
-        >
-          <Trash2 size={13} />
-        </button>
-      </div>
+      {canDelete && (
+        <div className="row-actions absolute inset-x-2 top-2 flex items-center justify-between">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect(contact.id)}
+            aria-label={`Select ${contact.firstName} ${contact.lastName}`}
+            className="h-4 w-4 cursor-pointer appearance-none rounded-[5px] border border-border bg-background transition-colors duration-150 checked:border-primary checked:bg-primary hover:border-primary/60"
+          />
+          <button
+            type="button"
+            onClick={() => onDelete(contact)}
+            aria-label="Delete contact"
+            title="Delete contact"
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      )}
 
       <AvatarWithInitials
         firstName={contact.firstName}
@@ -167,6 +176,11 @@ export default function ContactsPage() {
 
   const createContactMutation = useCreateContact();
   const deleteContactMutation = useDeleteContact();
+
+  // Mirrors contacts.routes.js — write is member+, delete is manager+.
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CONTACTS_WRITE);
+  const canDelete = can(PERMISSIONS.CONTACTS_DELETE);
 
   const contacts = data?.contacts || [];
   const total = data?.total || 0;
@@ -369,10 +383,12 @@ export default function ContactsPage() {
                 iconOnly
                 aria-label="View mode"
               />
-              <Button onClick={() => setIsAddModalOpen(true)}>
-                <Plus size={15} />
-                <span className="hidden sm:inline">Add Contact</span>
-              </Button>
+              {canWrite && (
+                <Button onClick={() => setIsAddModalOpen(true)}>
+                  <Plus size={15} />
+                  <span className="hidden sm:inline">Add Contact</span>
+                </Button>
+              )}
             </>
           }
         />
@@ -389,10 +405,12 @@ export default function ContactsPage() {
               {selectedIds.length} selected
             </span>
             <div className="flex items-center gap-2">
-              <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
-                <Trash2 size={13} />
-                Delete
-              </Button>
+              {canDelete && (
+                <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                  <Trash2 size={13} />
+                  Delete
+                </Button>
+              )}
               <button
                 type="button"
                 onClick={() => setSelectedIds([])}
@@ -411,7 +429,7 @@ export default function ContactsPage() {
               columns={columns}
               data={contacts}
               isLoading={isLoading}
-              selectable
+              selectable={canDelete}
               selectedIds={selectedIds}
               onSelectRow={handleSelectRow}
               onSelectAll={handleSelectAll}
@@ -422,23 +440,29 @@ export default function ContactsPage() {
                 totalPages,
                 onPageChange: (p) => setPage(p),
               }}
-              rowActions={(row) => (
-                <RowAction
-                  icon={<Trash2 size={14} />}
-                  label="Delete contact"
-                  tone="destructive"
-                  onClick={() => handleDeleteOne(row)}
-                />
-              )}
+              rowActions={
+                canDelete
+                  ? (row: Contact) => (
+                      <RowAction
+                        icon={<Trash2 size={14} />}
+                        label="Delete contact"
+                        tone="destructive"
+                        onClick={() => handleDeleteOne(row)}
+                      />
+                    )
+                  : undefined
+              }
               emptyIcon={<Contact2 size={22} />}
               emptyTitle={isFiltered ? 'No matching contacts' : 'No contacts yet'}
               emptyMessage={
                 isFiltered
                   ? 'Try loosening your filters — nothing matches this combination right now.'
-                  : 'Won leads convert into contacts automatically, or you can add one directly.'
+                  : canWrite
+                    ? 'Won leads convert into contacts automatically, or you can add one directly.'
+                    : 'Won leads convert into contacts automatically. Your role can view contacts but not add them.'
               }
               emptyAction={
-                isFiltered ? undefined : (
+                isFiltered || !canWrite ? undefined : (
                   <Button onClick={() => setIsAddModalOpen(true)}>
                     <Plus size={15} />
                     Add a contact
@@ -654,6 +678,9 @@ function GridView({
   totalPages,
   onPageChange,
 }: GridViewProps) {
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CONTACTS_WRITE);
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -685,9 +712,11 @@ function GridView({
         <p className="mt-1 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
           {isFiltered
             ? 'Try loosening your filters — nothing matches this combination right now.'
-            : 'Won leads convert into contacts automatically, or you can add one directly.'}
+            : canWrite
+              ? 'Won leads convert into contacts automatically, or you can add one directly.'
+              : 'Won leads convert into contacts automatically. Your role can view contacts but not add them.'}
         </p>
-        {!isFiltered && (
+        {!isFiltered && canWrite && (
           <Button className="mt-5" onClick={onAdd}>
             <Plus size={15} />
             Add a contact

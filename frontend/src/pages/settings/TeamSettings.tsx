@@ -311,7 +311,7 @@ export default function TeamSettings() {
       {/* ── Members ────────────────────────────────────────────────────────── */}
       <SettingsSection
         title={`Members${memberData ? ` · ${memberData.total}` : ''}`}
-        description="Roles decide what each person can do. Changes take effect on their next request."
+        description="Roles decide what each person can do. Changing a role signs that person out; it applies as soon as they sign back in."
         footer={
           canManage ? (
             <Button onClick={() => setInviteOpen(true)}>
