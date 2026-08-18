@@ -11,6 +11,7 @@ import axios, {
 } from 'axios';
 import toast from 'react-hot-toast';
 import { ERROR_MESSAGES, API_ENDPOINTS, MAX_RETRY_ATTEMPTS, ROUTES } from '@constants/index';
+import { API_BASE_URL, API_ORIGIN } from './apiBaseUrl';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ function processQueue(error: unknown, token: string | null = null): void {
 // ── Create Axios instance ──────────────────────────────────────────────────────
 
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api',
+  baseURL: API_BASE_URL, // validated at load — see ./apiBaseUrl
   withCredentials: true, // send httpOnly refresh cookie automatically
   headers: {
     'Content-Type': 'application/json',
@@ -174,8 +175,7 @@ async function refreshWithRetry(): Promise<AxiosResponse> {
  * credentials, and must never touch the auth interceptors.
  */
 export function warmUpApi(): void {
-  const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api';
-  const healthUrl = `${base.replace(/\/api\/?$/, '')}/health`;
+  const healthUrl = `${API_ORIGIN}/health`;
 
   // Errors are meaningless here — this is a nudge, not a check.
   void fetch(healthUrl, { method: 'GET', mode: 'cors' }).catch(() => {});

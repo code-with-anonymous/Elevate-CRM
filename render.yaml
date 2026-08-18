@@ -1,0 +1,83 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# render.yaml — Render Blueprint for the ElevateCRM API
+#
+# The frontend is on Vercel (https://elevate-crm-ai.vercel.app). Vercel serves a
+# static bundle and cannot run this Express server, so the API needs its own
+# host. This file describes that service so it can be created in one step:
+#   Render → New → Blueprint → point at this repo.
+#
+# Blueprints live at the REPO ROOT even when the service lives in a subfolder —
+# hence rootDir below.
+#
+# Values marked `sync: false` are deliberately NOT in git. Render prompts for
+# them once at create time and stores them encrypted. Never commit a secret here:
+# this file is public if the repo is.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: elevate-crm-api
+    runtime: node
+    plan: free
+    rootDir: backend
+
+    # `npm ci` not `npm install` — it installs exactly what package-lock.json
+    # pins, so a deploy can't silently pick up a newer minor version than the one
+    # tested locally.
+    buildCommand: npm ci
+    startCommand: npm start
+
+    # server.js binds env.PORT, which Render injects. Never hardcode 5000 here.
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Drives CORS *and* the links inside password-reset / invitation emails.
+      # No trailing slash — the CORS whitelist compares origins exactly, and
+      # "https://x.vercel.app/" would never match the browser's "https://x.vercel.app".
+      - key: CLIENT_URL
+        value: https://elevate-crm-ai.vercel.app
+
+      # THE setting that makes a split deployment work.
+      #
+      # The refresh token is an httpOnly cookie. A SameSite=Lax cookie is never
+      # sent on a cross-site request, and vercel.app → onrender.com IS cross-site.
+      # Without this, POST /auth/refresh arrives with no cookie: login succeeds,
+      # then the user is signed out the moment the access token expires. Setting
+      # it true switches the cookie to SameSite=None; Secure.
+      - key: CROSS_SITE_COOKIES
+        value: "true"
+
+      # Leave false. It would whitelist EVERY *.vercel.app origin, including
+      # other people's projects. Turn it on only while testing preview
+      # deployments, and turn it back off.
+      - key: ALLOW_VERCEL_PREVIEWS
+        value: "false"
+
+      # ── Prompted at create time, never stored in git ──────────────────────
+      - key: MONGODB_URI
+        sync: false
+      - key: ACCESS_TOKEN_SECRET
+        sync: false
+      - key: REFRESH_TOKEN_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+      - key: ACCESS_TOKEN_EXPIRES
+        value: 15m
+      - key: REFRESH_TOKEN_EXPIRES
+        value: 7d
+      - key: BCRYPT_ROUNDS
+        value: "12"

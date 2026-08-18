@@ -106,3 +106,79 @@ module.exports = {
   IS_PROD:               process.env.NODE_ENV === 'production',
   IS_DEV:                process.env.NODE_ENV === 'development',
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deployment sanity checks
+//
+// These run once at boot and only WARN — a misconfigured split deployment still
+// starts and serves traffic, it just breaks in a way that is very hard to
+// diagnose from the browser. Naming the problem in the server log is worth more
+// than refusing to start.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const cfg = module.exports;
+
+function hostOf(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
+
+const isLocal = (host) => !host || /^(localhost|127\.0\.0\.1)(:|$)/.test(host);
+
+if (cfg.IS_PROD) {
+  const clientHost = hostOf(cfg.CLIENT_URL);
+
+  // CLIENT_URL still on its localhost default. CORS will refuse the deployed
+  // frontend, and every reset-password / invitation email will link to a machine
+  // the recipient does not have.
+  if (isLocal(clientHost)) {
+    console.warn(
+      [
+        `[config] CLIENT_URL is "${cfg.CLIENT_URL}" in production.`,
+        '         CORS will block your deployed frontend, and links in outgoing',
+        '         emails will point at localhost. Set it to the deployed app',
+        '         origin, with no trailing slash.',
+      ].join('\n')
+    );
+  } else if (!cfg.CROSS_SITE_COOKIES) {
+    // The frontend is on a real domain but cookies are same-site.
+    //
+    // A SameSite=Lax cookie is NOT sent on a cross-site POST, so with the app on
+    // vercel.app and this API on onrender.com, POST /auth/refresh arrives with
+    // no refresh cookie. Login appears to work, then the user is signed out the
+    // moment their access token expires — which reads as broken auth rather than
+    // as a cookie policy.
+    console.warn(
+      [
+        `[config] CLIENT_URL is "${cfg.CLIENT_URL}" but CROSS_SITE_COOKIES=false.`,
+        '         If the app and this API are on DIFFERENT domains, the refresh',
+        '         cookie will not be sent and users will be signed out as soon as',
+        '         their access token expires. Set CROSS_SITE_COOKIES=true.',
+        '         Ignore this only if both are served from the same domain.',
+      ].join('\n')
+    );
+  }
+
+  // SameSite=None requires Secure, which browsers only honour over https.
+  if (cfg.CROSS_SITE_COOKIES && !String(cfg.CLIENT_URL).startsWith('https://')) {
+    console.warn(
+      [
+        '[config] CROSS_SITE_COOKIES=true sends SameSite=None; Secure, which',
+        `         browsers accept only over https. CLIENT_URL is "${cfg.CLIENT_URL}".`,
+      ].join('\n')
+    );
+  }
+
+  if (cfg.ALLOW_VERCEL_PREVIEWS) {
+    console.warn(
+      [
+        '[config] ALLOW_VERCEL_PREVIEWS=true trusts EVERY *.vercel.app origin,',
+        "         including other people's projects. Fine while iterating; turn",
+        '         it off once the production domain is settled.',
+      ].join('\n')
+    );
+  }
+}
