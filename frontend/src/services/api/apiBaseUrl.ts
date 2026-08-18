@@ -82,29 +82,48 @@ function resolve(): string {
   // The API pointed at the app's OWN origin.
   //
   // This is the mistake that costs the most time, because it does not look like
-  // a mistake: the URL is https, it is a real domain, and it responds 200. But
+  // a mistake: the URL is https, it is a real domain, and something answers. But
   // Vercel serves a static bundle here and vercel.json rewrites every unmatched
-  // path to /index.html — so `POST /api/auth/login` returns the HTML page with a
-  // 200, and axios fails trying to read HTML as JSON. The error surfaces as
-  // "Unexpected token '<'", which points nowhere near the real cause.
+  // path to /index.html, so (measured against a live deployment):
+  //
+  //   GET  /api/leads      -> 200 text/html   the SPA shell, not JSON
+  //   POST /api/auth/login -> 405             static hosts refuse POST
+  //
+  // Neither response mentions configuration, and 405 in particular sends people
+  // hunting through route definitions that are fine.
   //
   // The API is a separate Express service and must live on its own origin.
   if (typeof window !== 'undefined') {
+    // Parse inside the try, DECIDE outside it.
+    //
+    // The first version of this check wrapped everything — including the
+    // fatalConfig() call — in the try/catch, so the catch swallowed the very
+    // error it existed to raise. The failure mode was subtle and worth
+    // remembering: the red panel was painted, the throw was eaten, execution
+    // continued to the return below, React mounted over the warning, and the
+    // only surviving symptom was a 405 from POSTing at a static host. Nothing
+    // in the console mentioned configuration at all.
+    //
+    // Rule of thumb: a catch must never span the throw it is protecting.
+    let isOwnOrigin = false;
     try {
-      if (new URL(configured, window.location.href).origin === window.location.origin) {
-        fatalConfig(
-          `VITE_API_BASE_URL is "${configured}", which is this app's own origin ` +
-            `(${window.location.origin}).\n\n` +
-            'Nothing serves the API here — Vercel hosts the static frontend, and ' +
-            'vercel.json rewrites unknown paths to index.html, so /api/* returns ' +
-            'the HTML page instead of JSON.\n\n' +
-            'Deploy the Express backend separately (Render, Railway, Fly) and set ' +
-            'VITE_API_BASE_URL to THAT origin, e.g. ' +
-            'https://elevate-crm-api.onrender.com/api — then redeploy.'
-        );
-      }
+      isOwnOrigin =
+        new URL(configured, window.location.href).origin === window.location.origin;
     } catch {
-      // An unparseable URL is caught by the checks above; ignore here.
+      // Unparseable URL — the checks above already cover that case.
+      isOwnOrigin = false;
+    }
+
+    if (isOwnOrigin) {
+      fatalConfig(
+        `VITE_API_BASE_URL is "${configured}", which is this app's own origin ` +
+          `(${window.location.origin}).\n\n` +
+          'Nothing serves the API here — Vercel hosts the static frontend, and ' +
+          'vercel.json rewrites unknown paths to index.html, so GET /api/* returns ' +
+          'the HTML page and POST /api/* returns 405 Method Not Allowed.\n\n' +
+          'Deploy the Express backend separately (Render, Railway, Fly) and set ' +
+          'VITE_API_BASE_URL to THAT origin, ending in /api — then redeploy.'
+      );
     }
   }
 

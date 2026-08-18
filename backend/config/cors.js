@@ -12,6 +12,7 @@ const whitelist = new Set([
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:4173',
+  'https://elevate-crm-ai.vercel.app/',
   ...env.EXTRA_CORS_ORIGINS,
 ]);
 
