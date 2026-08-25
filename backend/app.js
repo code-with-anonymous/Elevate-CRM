@@ -44,7 +44,13 @@ const app = express();
 //
 // `1` (not `true`) trusts exactly one hop — the platform's own proxy. Trusting
 // all hops would let a client spoof X-Forwarded-For and bypass rate limiting.
-if (env.IS_PROD) {
+//
+// Gated on the PLATFORM, not only on NODE_ENV. Render injects RENDER=true into
+// every service, and a service whose NODE_ENV was never set still sits behind
+// the same TLS-terminating proxy — so keying this off NODE_ENV alone silently
+// lumps the whole internet into one rate-limit bucket on exactly the deploy that
+// was misconfigured. Behind a proxy is a fact about where we run, so detect it.
+if (env.IS_PROD || env.BEHIND_PROXY) {
   app.set('trust proxy', 1);
 }
 

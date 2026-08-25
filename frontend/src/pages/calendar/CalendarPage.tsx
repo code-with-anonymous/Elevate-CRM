@@ -166,7 +166,18 @@ function DayCell({ cell, events, isToday, isSelected, onSelect }: DayCellProps) 
       aria-label={`${cell.day} — ${events.length} event${events.length === 1 ? '' : 's'}`}
       aria-current={isToday ? 'date' : undefined}
       className={cn(
-        'group relative flex min-h-[104px] flex-col gap-1 p-2 text-left',
+        // `w-full` is load-bearing, not cosmetic. A <button> is a form control:
+        // its `width: auto` shrink-wraps to max-content even with `display:flex`,
+        // so a long pill title made the button 288px wide inside a 199px grid
+        // cell. The pill stretched to the button, `truncate` never had a narrow
+        // box to ellipsize into, and the text visibly ran under the next column.
+        //
+        // Measured, because the intuitive fix is wrong: adding `min-w-0` to the
+        // pill stack changes nothing (288px either way). In a COLUMN flex
+        // container the children's width is the cross axis, where `min-width:
+        // auto` already resolves to 0 — there is nothing to relax. The button
+        // shrink-wrapping was the whole problem.
+        'group relative flex w-full min-h-[104px] flex-col gap-1 p-2 text-left',
         'transition-colors duration-150 ease-out',
         'focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60',
         // Today gets a wash, not a filled block — the accent marks the day

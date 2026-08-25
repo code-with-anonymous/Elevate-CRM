@@ -9,6 +9,15 @@
 # Blueprints live at the REPO ROOT even when the service lives in a subfolder —
 # hence rootDir below.
 #
+# LIVE API: https://elevate-crm-4p49.onrender.com
+# That service was created outside this blueprint, so its name does not match
+# `name:` below and Render treats the two as separate services — applying this
+# file as-is would stand up a SECOND API rather than reconfigure the live one.
+# Either rename the service in the dashboard to match, or set the env vars below
+# by hand under Service → Environment. Every value in `envVars` still applies:
+# the live service currently answers `"env":"development"` on /health, meaning
+# NODE_ENV, CLIENT_URL and CROSS_SITE_COOKIES were never set on it.
+#
 # Values marked `sync: false` are deliberately NOT in git. Render prompts for
 # them once at create time and stores them encrypted. Never commit a secret here:
 # this file is public if the repo is.

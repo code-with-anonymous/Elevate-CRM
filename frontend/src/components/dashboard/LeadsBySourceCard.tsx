@@ -78,8 +78,22 @@ export default function LeadsBySourceCard() {
                   data={chartData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={46}
-                  outerRadius={64}
+                  // Percentages, not pixels. innerRadius={46}/outerRadius={64}
+                  // asked for a fixed 128px-wide donut, but this card lives in
+                  // `xl:col-span-3` — so the WIDER the viewport, the NARROWER the
+                  // card, and `md:w-1/2` then hands the chart about half of that.
+                  // Below a ~340px card the donut was drawn larger than its own
+                  // SVG and came out with its left and right sliced flat.
+                  //
+                  // Recharts resolves a percentage against getMaxRadius() =
+                  // min(plotWidth, plotHeight) / 2, so these track the smaller
+                  // dimension and can never exceed the box. 94/68 was picked to
+                  // preserve the current look where it already fitted: at full
+                  // width that is a 122px donut with a 17px ring, against 128/18
+                  // before — while a 250px card now yields a clean 70px donut
+                  // instead of a clipped one.
+                  innerRadius="68%"
+                  outerRadius="94%"
                   paddingAngle={2}
                   cornerRadius={3}
                   dataKey="value"
@@ -108,7 +122,14 @@ export default function LeadsBySourceCard() {
                     className="h-2 w-2 shrink-0 rounded-full"
                     style={{ backgroundColor: item.fill }}
                   />
-                  <span className="truncate text-foreground">{item.name}</span>
+                  {/* `title` because this label truncates: in a narrow card
+                      "Cold Outreach" renders as "Cold Outre…" and there was no
+                      way to read the rest. Truncating stays the right call —
+                      wrapping would make the rows uneven and push the last
+                      source out of the card. */}
+                  <span className="truncate text-foreground" title={item.name}>
+                    {item.name}
+                  </span>
                 </span>
                 <span className="shrink-0 font-medium tabular-nums text-muted-foreground">
                   {formatNumber(item.value)}

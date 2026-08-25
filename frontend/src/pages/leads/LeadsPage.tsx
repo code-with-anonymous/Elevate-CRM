@@ -153,10 +153,21 @@ export default function LeadsPage() {
       sortable: true,
       accessor: (row) => (
         <div className="flex items-center gap-3">
+          {/* Initials only — deliberately no avatarUrl.
+              This passed `avatarUrl={row.assignedTo?.avatarUrl}`, so the cell
+              showed the LEAD's name beside the OWNER's photograph. Any lead
+              owned by someone with a profile picture wore that person's face,
+              and two different people in the same row appeared to be the same
+              person. The alt text made it worse: AvatarWithInitials derives alt
+              from firstName/lastName, so the owner's photo was announced as the
+              lead's name.
+              Leads have no avatar of their own — models/Lead.js has no such
+              field, and `avatarUrl` reaches the client only on the populated
+              `assignedTo` user — so initials are the only honest option here.
+              LeadDetailPage renders the same lead exactly this way. */}
           <AvatarWithInitials
             firstName={row.firstName}
             lastName={row.lastName}
-            avatarUrl={row.assignedTo?.avatarUrl}
             size="md"
           />
           <div className="min-w-0">

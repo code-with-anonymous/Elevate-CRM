@@ -105,6 +105,22 @@ module.exports = {
   // Helpers
   IS_PROD:               process.env.NODE_ENV === 'production',
   IS_DEV:                process.env.NODE_ENV === 'development',
+
+  // ── Platform ────────────────────────────────────────────────────────────────
+  // True when a managed host is terminating TLS in front of us, which is a fact
+  // about the runtime and NOT about NODE_ENV — a Render service with NODE_ENV
+  // unset is still behind Render's proxy. app.js uses this to decide
+  // `trust proxy`, so express-rate-limit keeps bucketing by real client IP even
+  // on a deploy where NODE_ENV was forgotten.
+  //
+  // RENDER is injected by Render itself; the others cover the usual suspects.
+  BEHIND_PROXY:          Boolean(
+                           process.env.RENDER ||
+                           process.env.FLY_APP_NAME ||
+                           process.env.DYNO ||
+                           process.env.RAILWAY_ENVIRONMENT ||
+                           process.env.TRUST_PROXY === 'true'
+                         ),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,8 +144,27 @@ function hostOf(url) {
 
 const isLocal = (host) => !host || /^(localhost|127\.0\.0\.1)(:|$)/.test(host);
 
-if (cfg.IS_PROD) {
+// Run the checks on any hosted deploy, not only when NODE_ENV says production.
+//
+// A Render service with NODE_ENV unset defaults to 'development' here, which
+// used to skip this whole block — so the one deploy most likely to be
+// misconfigured was also the only one that said nothing about it. `GET /health`
+// reporting `"env":"development"` from a public URL is the tell.
+if (cfg.IS_PROD || cfg.BEHIND_PROXY) {
   const clientHost = hostOf(cfg.CLIENT_URL);
+
+  // NODE_ENV unset on a hosted service. More than cosmetic: IS_PROD gates
+  // `trust proxy`, morgan's log format, and the Secure flag on the refresh
+  // cookie when CROSS_SITE_COOKIES is off.
+  if (!cfg.IS_PROD) {
+    console.warn(
+      [
+        `[config] NODE_ENV is "${cfg.NODE_ENV}" on a hosted deploy.`,
+        '         Set NODE_ENV=production in the service environment — it gates',
+        '         proxy trust, production logging, and the Secure cookie flag.',
+      ].join('\n')
+    );
+  }
 
   // CLIENT_URL still on its localhost default. CORS will refuse the deployed
   // frontend, and every reset-password / invitation email will link to a machine

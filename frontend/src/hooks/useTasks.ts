@@ -1,5 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { taskService, TaskItem, GetTasksParams } from '@/services/api/taskService';
+import {
+  taskService,
+  GetTasksParams,
+  TaskWritePayload,
+} from '@/services/api/taskService';
 import { CALENDAR_QK } from '@/hooks/useCalendar';
 import toast from 'react-hot-toast';
 
@@ -28,7 +32,7 @@ export function useTask(id: string) {
 export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<TaskItem>) => taskService.createTask(data),
+    mutationFn: (data: TaskWritePayload) => taskService.createTask(data),
     onSuccess: () => {
       toast.success('Task created');
       queryClient.invalidateQueries({ queryKey: TASKS_QK.all });
@@ -44,7 +48,7 @@ export function useCreateTask() {
 export function useUpdateTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<TaskItem> }) =>
+    mutationFn: ({ id, data }: { id: string; data: TaskWritePayload }) =>
       taskService.updateTask(id, data),
     onSuccess: (_, variables) => {
       toast.success('Task updated');

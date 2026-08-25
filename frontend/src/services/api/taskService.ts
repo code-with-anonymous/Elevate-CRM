@@ -28,6 +28,31 @@ export interface TaskItem {
   updatedAt: string;
 }
 
+/**
+ * What the API accepts on POST /tasks and PATCH /tasks/:id.
+ *
+ * This is NOT `Partial<TaskItem>`, and the difference is the whole reason
+ * assignment could not be expressed before: a response carries `assignedTo` as a
+ * POPULATED user object, while a write takes a bare user id. Typing writes as
+ * `Partial<TaskItem>` therefore demanded `{ id, firstName, lastName, avatarUrl }`
+ * where the server wants `"6a7c…"`, so `assignedTo: userId` was a type error and
+ * there was no legal way to assign a task from the client at all.
+ *
+ * Field list mirrors `allowedFields` in backend/controllers/tasks.controller.js —
+ * anything absent there is silently dropped, so it is absent here too.
+ */
+export interface TaskWritePayload {
+  title?: string;
+  description?: string | null;
+  priority?: TaskItem['priority'];
+  status?: TaskItem['status'];
+  dueDate?: string | null;
+  /** User id to assign to, or `null` to unassign. */
+  assignedTo?: string | null;
+  relatedTo?: string | null;
+  relatedModel?: TaskItem['relatedModel'];
+}
+
 export interface GetTasksParams {
   page?: number;
   limit?: number;
@@ -65,12 +90,12 @@ export const taskService = {
     return res.data.data;
   },
 
-  createTask: async (data: Partial<TaskItem>): Promise<TaskItem> => {
+  createTask: async (data: TaskWritePayload): Promise<TaskItem> => {
     const res = await axiosInstance.post('/tasks', data);
     return res.data.data;
   },
 
-  updateTask: async (id: string, data: Partial<TaskItem>): Promise<TaskItem> => {
+  updateTask: async (id: string, data: TaskWritePayload): Promise<TaskItem> => {
     const res = await axiosInstance.patch(`/tasks/${id}`, data);
     return res.data.data;
   },

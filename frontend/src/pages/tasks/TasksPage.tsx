@@ -54,6 +54,7 @@ import {
 } from '@/hooks/useTasks';
 import { useTaskDrag } from '@/hooks/useTaskDrag';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useTeamMembers } from '@/hooks/useTeam';
 import { PERMISSIONS } from '@/constants/permissions';
 import { TaskItem } from '@/services/api/taskService';
 import { formatRelativeDate, isOverdue } from '@/lib/format';
@@ -403,6 +404,16 @@ export default function TasksPage() {
   const canWrite = can(PERMISSIONS.TASKS_WRITE);
   const canDelete = can(PERMISSIONS.TASKS_DELETE);
 
+  // Assignable teammates. GET /api/team/members is open to any authenticated
+  // member (only the MUTATIONS are owner/admin), so this needs no extra
+  // permission — but it is only fetched when the user can actually write, since
+  // a read-only role has nothing to do with the list.
+  //
+  // Suspended people are filtered out: they still appear on the Team page for
+  // history, but assigning work to a deactivated account is a silent dead end.
+  const { data: teamData } = useTeamMembers();
+  const assignableMembers = (teamData?.members ?? []).filter((m) => m.status !== 'Suspended');
+
   const tasks = data?.tasks || [];
   const total = data?.total || 0;
 
@@ -413,12 +424,15 @@ export default function TasksPage() {
     priority: 'High' | 'Medium' | 'Low';
     status: TaskStatus;
     dueDate: string;
+    /** User id, or empty string for unassigned. */
+    assignedTo: string;
   }>({
     title: '',
     description: '',
     priority: 'Medium',
     status: 'Open',
     dueDate: '',
+    assignedTo: '',
   });
 
   /** Board "+" buttons open the composer already pointed at that column. */
@@ -459,6 +473,14 @@ export default function TasksPage() {
       {
         ...newTaskData,
         dueDate: newTaskData.dueDate ? new Date(newTaskData.dueDate).toISOString() : null,
+        // '' is the Unassigned option; the API wants null.
+        //
+        // POST would actually tolerate '' — the controller does
+        // `assignedTo || null` — but PATCH does NOT: it copies the body value
+        // through verbatim and Mongoose then fails to cast '' to an ObjectId.
+        // Normalising here keeps create and reassign sending the same shape,
+        // rather than relying on a coercion that exists on only one of the two.
+        assignedTo: newTaskData.assignedTo || null,
       },
       {
         onSuccess: () => {
@@ -469,12 +491,30 @@ export default function TasksPage() {
             priority: 'Medium',
             status: 'Open',
             dueDate: '',
+            assignedTo: '',
           });
         },
       }
     );
   };
 
+
+  // ── Reassign ──────────────────────────────────────────────────────────────
+  /**
+   * PATCH /tasks/:id with a new assignee. '' means unassign, which the API needs
+   * as null — an empty string fails Mongoose's ObjectId cast.
+   *
+   * No-ops when the pick matches the current assignee, so re-selecting the same
+   * name doesn't fire a request and a pointless "Task updated" toast.
+   */
+  const handleReassign = (task: TaskItem, userId: string) => {
+    const current = task.assignedTo?.id ?? '';
+    if (userId === current) return;
+    updateTaskMutation.mutate({
+      id: task.id || task._id || '',
+      data: { assignedTo: userId || null },
+    });
+  };
   // ── Toggle complete ───────────────────────────────────────────────────────
   const handleToggleComplete = (task: TaskItem, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -580,8 +620,51 @@ export default function TasksPage() {
       key: 'assignedTo',
       header: 'Assignee',
       hideOnMobile: true,
+      // Read-only roles keep the plain avatar + name. For anyone with
+      // tasks:write this cell IS the reassign control — a task assigned to the
+      // wrong person was otherwise unfixable, since nothing in the UI could set
+      // assignedTo after creation.
+      //
+      // Borderless until hover/focus so a column of selects doesn't shout, which
+      // is the same treatment the board card gives its status dropdown.
       accessor: (row) =>
-        row.assignedTo ? (
+        canWrite ? (
+          <div className="flex items-center gap-2">
+            {row.assignedTo && (
+              <AvatarWithInitials
+                firstName={row.assignedTo.firstName}
+                lastName={row.assignedTo.lastName}
+                avatarUrl={row.assignedTo.avatarUrl}
+                size="xs"
+              />
+            )}
+            <select
+              value={row.assignedTo?.id ?? ''}
+              aria-label={`Assignee for ${row.title}`}
+              // Rows are clickable in some tables; keep a dropdown click from
+              // also triggering whatever the row does.
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleReassign(row, e.target.value);
+              }}
+              className={cn(
+                'max-w-[130px] truncate rounded-md border border-transparent bg-transparent',
+                'py-0.5 pl-1 pr-5 text-[13px] text-muted-foreground outline-none',
+                'transition-colors duration-150',
+                'hover:border-border/60 hover:bg-card hover:text-foreground',
+                'focus:border-primary/50 focus:bg-card focus:text-foreground'
+              )}
+            >
+              <option value="">Unassigned</option>
+              {assignableMembers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.firstName} {m.lastName}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : row.assignedTo ? (
           <div className="flex items-center gap-2">
             <AvatarWithInitials
               firstName={row.assignedTo.firstName}
@@ -923,6 +1006,28 @@ export default function TasksPage() {
                     onChange={(e) => setNewTaskData({ ...newTaskData, dueDate: e.target.value })}
                     className={cn(controlClass, 'tabular-nums')}
                   />
+                </Field>
+
+                {/* Assignee. The backend has always accepted `assignedTo` on
+                    POST /tasks and shown the avatar in the list — there was just
+                    no control for setting it, so every task was created
+                    unassigned and could never be handed to anyone. */}
+                <Field label="Assignee" htmlFor="t-assignee">
+                  <select
+                    id="t-assignee"
+                    value={newTaskData.assignedTo}
+                    onChange={(e) =>
+                      setNewTaskData({ ...newTaskData, assignedTo: e.target.value })
+                    }
+                    className={selectClass}
+                  >
+                    <option value="">Unassigned</option>
+                    {assignableMembers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.firstName} {m.lastName}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
 
                 <div className="flex gap-2 pt-1">
