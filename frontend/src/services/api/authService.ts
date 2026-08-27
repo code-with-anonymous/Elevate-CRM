@@ -2,7 +2,7 @@
 // src/services/api/authService.ts
 // All authentication API calls — fully typed with TypeScript interfaces
 // ─────────────────────────────────────────────────────────────────────────────
-import axiosInstance from './axiosInstance';
+import axiosInstance, { refreshWithRetry } from './axiosInstance';
 import { API_ENDPOINTS } from '@constants/index';
 import type {
   AuthResponse,
@@ -113,12 +113,21 @@ const authService = {
    *
    * Typed optional because a deployed backend older than this change sends
    * tokens only; useRefreshSession falls back to the persisted user in that case.
+   *
+   * @param opts.tolerateColdStart
+   *   Route through refreshWithRetry — a 45s timeout and three attempts with
+   *   backoff — instead of one 30s call. Pass this on the app-boot restore and
+   *   nowhere else. That call decides whether the user is signed in at all, and
+   *   on a spun-down Render free-tier instance a 30-60s cold start reads as a
+   *   dead session: the user lands on /login with a valid cookie in the jar, and
+   *   there is no "next request" to recover on because they never got in.
+   *   A mid-session call can afford to fail — the interceptor retries it.
    */
-  refreshToken: async (): Promise<RefreshResponse> => {
-    const response = await axiosInstance.post<Envelope<RefreshResponse>>(
-      API_ENDPOINTS.AUTH.REFRESH
-    );
-    return response.data.data;
+  refreshToken: async (opts?: { tolerateColdStart?: boolean }): Promise<RefreshResponse> => {
+    const response = opts?.tolerateColdStart
+      ? await refreshWithRetry()
+      : await axiosInstance.post<Envelope<RefreshResponse>>(API_ENDPOINTS.AUTH.REFRESH);
+    return (response.data as Envelope<RefreshResponse>).data;
   },
 
   // ── Password Management ───────────────────────────────────────────────────

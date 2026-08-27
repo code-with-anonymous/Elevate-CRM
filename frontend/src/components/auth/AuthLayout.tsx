@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@lib/cn';
 import { APP_NAME } from '@constants/index';
+import { LogoMark } from '@components/common/Logo';
 
 export interface AuthLayoutProps {
   children: ReactNode;
@@ -53,22 +54,11 @@ function AuthLayout({
         {/* Logo */}
         {showLogo && (
           <div className="mb-8 flex flex-col items-center">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/30">
-              <svg
-                className="h-7 w-7 text-primary-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-            </div>
+            {/* Mark + text rather than the full wordmark: the lockup's type is
+                dark navy, which disappears against the dark card in dark theme.
+                The plated mark reads on both, and APP_NAME below carries the
+                name in the theme's own foreground colour. */}
+            <LogoMark size={56} className="mb-4 shadow-lg" />
             <span className="text-xl font-semibold tracking-tight text-foreground">
               {APP_NAME}
             </span>

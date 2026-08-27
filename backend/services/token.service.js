@@ -111,9 +111,37 @@ function refreshCookieOptions() {
   };
 }
 
+/**
+ * How long a refresh token lives, in ms, from REFRESH_TOKEN_EXPIRES.
+ *
+ * The cookie maxAge and the DB expiry row were both hardcoded to 7 days while
+ * the JWT itself used the env var, so REFRESH_TOKEN_EXPIRES was only ever half
+ * applied: setting it to anything but `7d` left the browser holding a cookie
+ * long after the token inside it had expired, and a row in Mongo outliving both.
+ * All three now come from one place.
+ *
+ * @returns {number} milliseconds
+ */
+function refreshTokenMaxAgeMs() {
+  const seconds = parseExpiresIn(env.REFRESH_TOKEN_EXPIRES);
+  // parseExpiresIn yields NaN for a malformed value (a bare number, or "30min").
+  // A NaN maxAge makes the cookie a session cookie — silently dropped on browser
+  // close — so fall back to the documented default rather than half-working.
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    console.warn(
+      `[token] REFRESH_TOKEN_EXPIRES="${env.REFRESH_TOKEN_EXPIRES}" is not parseable ` +
+        '(expected a number plus one of s/m/h/d, e.g. "30m"). Falling back to 7d.'
+    );
+    return 7 * 24 * 60 * 60 * 1000;
+  }
+  return seconds * 1000;
+}
+
 function setRefreshCookie(res, token) {
-  const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
-  res.cookie('refreshToken', token, { ...refreshCookieOptions(), maxAge });
+  res.cookie('refreshToken', token, {
+    ...refreshCookieOptions(),
+    maxAge: refreshTokenMaxAgeMs(),
+  });
 }
 
 function clearRefreshCookie(res) {
@@ -133,7 +161,8 @@ function clearRefreshCookie(res) {
  */
 async function saveRefreshToken(userId, rawToken, req) {
   const hashed    = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  // Same source as the cookie and the JWT — see refreshTokenMaxAgeMs.
+  const expiresAt = new Date(Date.now() + refreshTokenMaxAgeMs());
 
   const refreshTokenDoc = await RefreshToken.create({
     userId,

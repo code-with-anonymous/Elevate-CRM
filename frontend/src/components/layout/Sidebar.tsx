@@ -18,9 +18,9 @@ import {
   UserCircle,
   Users,
   UsersRound,
-  Zap,
 } from 'lucide-react';
-import { ROUTES } from '@/constants';
+import { ROUTES, APP_NAME } from '@/constants';
+import { LogoMark } from '@/components/common/Logo';
 import { PERMISSIONS, type Permission } from '@/constants/permissions';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthStore } from '@/store/authStore';
@@ -173,10 +173,14 @@ export default function Sidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[68px] flex-col items-center border-r border-sidebar-border bg-sidebar py-5 md:flex">
-      {/* Mark */}
-      <div className="accent-gradient mb-7 flex h-9 w-9 items-center justify-center rounded-[10px] shadow-sm">
-        <Zap size={17} className="fill-white text-white" />
-      </div>
+      {/* Mark — links home, the way a product logo is expected to */}
+      <NavLink
+        to={ROUTES.DASHBOARD}
+        aria-label={`${APP_NAME} — dashboard`}
+        className="mb-7 rounded-[10px] transition-opacity duration-150 hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+      >
+        <LogoMark size={36} />
+      </NavLink>
 
       <nav className="flex flex-1 flex-col items-center gap-1">
         {navItems.map((item) => (

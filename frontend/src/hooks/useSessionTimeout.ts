@@ -6,6 +6,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/authStore';
+import { markActivity, clearActivity } from '@/hooks/useAuthActions';
 import { SESSION_TIMEOUT_MS, SESSION_WARNING_MS, ROUTES } from '@constants/index';
 
 export interface UseSessionTimeoutReturn {
@@ -45,6 +46,9 @@ export function useSessionTimeout(): UseSessionTimeoutReturn {
   const handleSessionExpiry = useCallback((): void => {
     clearTimers();
     clearAuth();
+    // Drop the stamp too, or the next boot would read a fresh-enough timestamp
+    // and silently restore the session this timer just ended.
+    clearActivity();
     navigate(
       `${ROUTES.SESSION_EXPIRED}?returnTo=${encodeURIComponent(window.location.pathname)}`,
       { replace: true }
@@ -73,6 +77,12 @@ export function useSessionTimeout(): UseSessionTimeoutReturn {
     clearTimers();
 
     if (!isAuthenticated) return;
+
+    // Mirror the in-memory timer to storage. This is the only record that
+    // outlives the page, and it is what lets a reload distinguish "was active a
+    // minute ago" from "has been idle for an hour". Already throttled to at most
+    // one write per second by the caller below.
+    markActivity();
 
     // Set warning timer (fires SESSION_WARNING_MS before timeout)
     warningRef.current = setTimeout(() => {

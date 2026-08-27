@@ -13,20 +13,8 @@ import { ROUTES } from '@constants/index';
 import ProtectedRoute from './ProtectedRoute';
 import PublicRoute from './PublicRoute';
 import RoleRoute from './RoleRoute';
+import PageLoader from '@components/common/PageLoader';
 import { UserRole } from '@/types/auth';
-
-// ── Global Loading Fallback ────────────────────────────────────────────────────
-
-function PageLoader(): React.JSX.Element {
-  return (
-    <div className="flex h-screen w-full items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
-    </div>
-  );
-}
 
 // ── Lazy Page Imports — Auth ───────────────────────────────────────────────────
 

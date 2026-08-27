@@ -105,6 +105,17 @@ export const STORAGE_KEYS = {
   ORGANIZATION: 'crm_org',
   THEME: 'crm_theme',
   REMEMBER_ME: 'crm_remember',
+  /**
+   * Timestamp of the last user interaction, in localStorage — deliberately not
+   * sessionStorage, because a new tab has to be able to read it.
+   *
+   * useSessionTimeout enforces the 30-minute idle policy while the app is open,
+   * but a reload wipes its in-memory timer. This is how the policy survives a
+   * reload: useAppBootstrap only attempts a session restore if this stamp is
+   * under SESSION_TIMEOUT_MS old. It holds a millisecond timestamp and nothing
+   * else — no token, no identity.
+   */
+  LAST_ACTIVITY: 'crm_last_activity',
 } as const;
 
 // ── Permission Codes ──────────────────────────────────────────────────────────

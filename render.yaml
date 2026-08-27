@@ -86,7 +86,24 @@ services:
 
       - key: ACCESS_TOKEN_EXPIRES
         value: 15m
+
+      # The session policy: 30 minutes idle, then sign in again.
+      #
+      # This is the SERVER half of it. The client half is VITE_SESSION_TIMEOUT_MS
+      # (30 min, frontend/src/constants/index.ts) which drives the warning modal
+      # and the idle logout while a tab is open — but a client timer is not
+      # enforcement, and a page reload wipes it. This value is what actually ends
+      # the session: 30 minutes after the last refresh, the cookie is dead and
+      # POST /auth/refresh answers 401.
+      #
+      # Active users are not cut off at 30 minutes. The refresh token rotates on
+      # every /auth/refresh, which fires whenever the 15m access token expires —
+      # so anyone using the app re-ups roughly twice per window and never reaches
+      # the wall. Only genuine idleness gets there.
+      #
+      # Keep this comfortably above ACCESS_TOKEN_EXPIRES. If it ever drops below,
+      # the session dies before the client has any reason to rotate it.
       - key: REFRESH_TOKEN_EXPIRES
-        value: 7d
+        value: 30m
       - key: BCRYPT_ROUNDS
         value: "12"

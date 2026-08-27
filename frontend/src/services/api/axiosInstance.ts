@@ -12,6 +12,7 @@ import axios, {
 import toast from 'react-hot-toast';
 import { ERROR_MESSAGES, API_ENDPOINTS, MAX_RETRY_ATTEMPTS, ROUTES } from '@constants/index';
 import { API_BASE_URL, API_ORIGIN } from './apiBaseUrl';
+import { useAuthStore } from '@store/authStore';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,31 +28,22 @@ interface RefreshTokenResponse {
   };
 }
 
-// ── Lazy store getter — avoids circular dependency ─────────────────────────────
-// We import the store lazily to prevent the circular:
-// axiosInstance → authStore → axiosInstance
-function getAuthStore(): {
-  accessToken: string | null;
-  setAuth: (user: never, token: string, org: never, expiresIn?: number) => void;
-  clearAuth: () => void;
-} | null {
-  try {
-    // Dynamic import resolved synchronously since Zustand store is a module singleton
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { useAuthStore } = require('@store/authStore') as {
-      useAuthStore: {
-        getState: () => {
-          accessToken: string | null;
-          setAuth: (user: never, token: string, org: never, expiresIn?: number) => void;
-          clearAuth: () => void;
-        };
-      };
-    };
-    return useAuthStore.getState();
-  } catch {
-    return null;
-  }
-}
+// ── Store access ───────────────────────────────────────────────────────────────
+//
+// This was a `require('@store/authStore')` inside a try/catch, on the theory that
+// a static import would create the cycle axiosInstance → authStore →
+// axiosInstance. There is no such cycle: authStore imports zustand, the auth
+// types, and the constants — never axios.
+//
+// The cost of that shim was total. `require` does not exist in a browser ESM
+// bundle, so every call threw ReferenceError, the bare catch swallowed it, and
+// getAuthStore() returned null forever. The request interceptor below therefore
+// never attached an Authorization header to ANY request: every authenticated
+// call 401'd and paid a full refresh round-trip before succeeding, and
+// clearAuth() on a rejected refresh was a no-op.
+//
+// A plain import. The store is a module singleton, so getState() is always the
+// live state.
 
 // ── Transient vs. terminal failures ───────────────────────────────────────────
 //
@@ -68,7 +60,7 @@ function getAuthStore(): {
 // bounced to /session-expired, with a perfectly valid cookie still in the jar.
 
 /** True only when the SERVER rejected us. Network noise is not an auth answer. */
-function isAuthRejection(error: unknown): boolean {
+export function isAuthRejection(error: unknown): boolean {
   const status = (error as AxiosError)?.response?.status;
   return status === 401 || status === 403;
 }
@@ -129,7 +121,7 @@ const axiosInstance: AxiosInstance = axios.create({
  * A 401/403 aborts immediately — retrying a rejected token just delays the
  * inevitable sign-out by seven seconds.
  */
-async function refreshWithRetry(): Promise<AxiosResponse> {
+export async function refreshWithRetry(): Promise<AxiosResponse> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < REFRESH_MAX_ATTEMPTS; attempt++) {
@@ -185,8 +177,7 @@ export function warmUpApi(): void {
 
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    const store = getAuthStore();
-    const token = store?.accessToken;
+    const token = useAuthStore.getState().accessToken;
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -239,13 +230,9 @@ axiosInstance.interceptors.response.use(
         const expiresIn = responseData.data?.tokens?.expiresIn ?? (response.data as { tokens?: { expiresIn?: number } }).tokens?.expiresIn ?? 900;
 
         // Update token in store
-        const store = getAuthStore();
-        if (store) {
-          const { useAuthStore } = await import('@store/authStore');
-          const state = useAuthStore.getState();
-          if (state.user && state.organization) {
-            state.setAuth(state.user as never, newToken, state.organization as never, expiresIn);
-          }
+        const state = useAuthStore.getState();
+        if (state.user && state.organization) {
+          state.setAuth(state.user, newToken, state.organization, expiresIn);
         }
 
         processQueue(null, newToken);
@@ -271,8 +258,7 @@ axiosInstance.interceptors.response.use(
           return Promise.reject(refreshError);
         }
 
-        const store = getAuthStore();
-        store?.clearAuth();
+        useAuthStore.getState().clearAuth();
 
         // Only redirect if not already on an auth page
         const isAuthPage = window.location.pathname.startsWith('/login') ||

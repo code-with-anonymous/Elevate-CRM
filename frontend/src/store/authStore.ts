@@ -18,8 +18,25 @@ interface PersistedState {
   role: UserRole | undefined;
 }
 
+/**
+ * Where the app is in restoring a session on boot.
+ *
+ * `accessToken` is memory-only, so every page load starts with no token and
+ * `isAuthenticated: false` — indistinguishable, to a route guard, from a signed
+ * out user. The guards used to act on that immediately and bounce a reload to
+ * /login before the silent refresh had even been attempted.
+ *
+ * `'restoring'` is the missing third state: not authenticated, but don't decide
+ * yet. App.tsx holds the router back until this reads `'ready'`.
+ *
+ * There was a `_hydrated` flag here meant for this job. It was written and never
+ * read by anything, which is why the race survived.
+ */
+export type AuthStatus = 'restoring' | 'ready';
+
 interface AuthStoreInternal extends AuthStore {
-  _hydrated: boolean;
+  authStatus: AuthStatus;
+  setAuthStatus: (status: AuthStatus) => void;
 }
 
 // ── Default Role ───────────────────────────────────────────────────────────────
@@ -61,6 +78,11 @@ export const useAuthStore = create<AuthStoreInternal>()(
       pendingTwoFactor: false,
       otpDestination: null,
 
+      // Boot begins mid-restore. useAppBootstrap flips this to 'ready' exactly
+      // once, in a finally, whatever the outcome — so a thrown refresh can never
+      // leave the app stuck behind the loading gate.
+      authStatus: 'restoring',
+
       // ── Actions ───────────────────────────────────────────────────────────────
 
       /**
@@ -77,6 +99,7 @@ export const useAuthStore = create<AuthStoreInternal>()(
           accessToken: token, // memory only
           isAuthenticated: true,
           isLoading: false,
+          authStatus: 'ready',
           // `?? []` rather than trusting the field: an older backend, or the
           // Google login path, can omit it, and `undefined.includes` in
           // hasPermission would take the whole app down.
@@ -103,6 +126,9 @@ export const useAuthStore = create<AuthStoreInternal>()(
           sessionExpiry: null,
           pendingTwoFactor: false,
           otpDestination: null,
+          // Releases the loading gate. A cleared session is a decided one — the
+          // guards should redirect to /login now, not keep showing a spinner.
+          authStatus: 'ready',
         });
       },
 
@@ -178,7 +204,9 @@ export const useAuthStore = create<AuthStoreInternal>()(
         set({ isLoading: loading });
       },
 
-      _hydrated: false,
+      setAuthStatus: (status: AuthStatus): void => {
+        set({ authStatus: status });
+      },
     }),
     {
       name: STORAGE_KEYS.USER,
@@ -195,14 +223,14 @@ export const useAuthStore = create<AuthStoreInternal>()(
 
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Mark as hydrated
-          state._hydrated = true;
-
-          // If we have user data but no token (new tab / page reload)
-          // the app will need to silently refresh on mount
+          // User data survived the reload but the access token did not — it was
+          // never persisted. isAuthenticated must follow the token, not the
+          // user, or a guard would wave through a session with nothing to
+          // authenticate its requests.
+          //
+          // `authStatus` stays 'restoring' (its initial value) so the guards
+          // don't act on that `false` until useAppBootstrap has had its turn.
           if (state.user && !state.accessToken) {
-            // isAuthenticated stays false until token is refreshed
-            // The router/app bootstrap should attempt refreshToken() on mount
             state.isAuthenticated = false;
           }
         }
@@ -223,3 +251,4 @@ export const selectAccessToken = (state: AuthStoreInternal): string | null => st
 export const selectPendingTwoFactor = (state: AuthStoreInternal): boolean => state.pendingTwoFactor;
 export const selectOtpDestination = (state: AuthStoreInternal): string | null => state.otpDestination;
 export const selectSessionExpiry = (state: AuthStoreInternal): number | null => state.sessionExpiry;
+export const selectAuthStatus = (state: AuthStoreInternal): AuthStatus => state.authStatus;

@@ -10,7 +10,9 @@ import { HelmetProvider } from 'react-helmet-async';
 import { router } from '@routes/index';
 import { RouterProvider } from 'react-router-dom';
 import { useAppBootstrap } from '@/hooks/useAuthActions';
+import { useAuthStore } from '@store/authStore';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
+import PageLoader from '@/components/common/PageLoader';
 import { warmUpApi } from '@/services/api/axiosInstance';
 import { useEffect } from 'react';
 
@@ -29,14 +31,30 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   const { bootstrap } = useAppBootstrap();
+  const authStatus = useAuthStore((s) => s.authStatus);
 
   useEffect(() => {
     // Nudge the API awake before anything needs it. On a spun-down Render
     // instance the boot happens while the user reads the page, instead of
     // stalling their first real request for 45 seconds.
     warmUpApi();
-    bootstrap();
+    void bootstrap();
   }, [bootstrap]);
+
+  // THE fix for "refreshing the page bounces me to /login".
+  //
+  // React commits children before parents, and <Navigate> fires from a child
+  // effect — so ProtectedRoute's redirect ran before this component's effect had
+  // called bootstrap() even once. On every reload the guard read the
+  // isAuthenticated: false that a reload always starts with, sent the user to
+  // /login, and the silent refresh finished a moment later into PublicRoute,
+  // which bounced them on to /dashboard. Hence the login flash and the lost page.
+  //
+  // Nothing mounts the router until the restore has actually resolved. The
+  // guards then read a settled answer, and a reload stays where it was.
+  if (authStatus === 'restoring') {
+    return <PageLoader />;
+  }
 
   return <RouterProvider router={router} />;
 }

@@ -20,7 +20,8 @@ import {
   Sun,
   User,
 } from 'lucide-react';
-import { ROUTES } from '@/constants';
+import { ROUTES, APP_NAME } from '@/constants';
+import { LogoMark } from '@/components/common/Logo';
 import { useAuthStore } from '@/store/authStore';
 import { useLogout } from '@/hooks/useAuthActions';
 import { useNotificationStore } from '@/store/notificationStore';
@@ -355,6 +356,16 @@ export default function TopNavbar() {
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border/60 bg-card/80 px-4 backdrop-blur-xl backdrop-saturate-150 sm:px-6">
+      {/* Brand, mobile only. The rail carries it from `md` up; below that the
+          rail is gone and the chrome had no brand at all. */}
+      <NavLink
+        to={ROUTES.DASHBOARD}
+        aria-label={`${APP_NAME} — dashboard`}
+        className="mr-1 shrink-0 rounded-[10px] transition-opacity duration-150 hover:opacity-85 md:hidden"
+      >
+        <LogoMark size={28} />
+      </NavLink>
+
       {/* Tabs — scroll horizontally on narrow screens rather than wrapping */}
       <nav className="no-scrollbar -mx-1 flex h-full min-w-0 items-center gap-0.5 overflow-x-auto px-1">
         {TABS.map((tab) => (
