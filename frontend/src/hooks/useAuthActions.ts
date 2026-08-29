@@ -5,10 +5,12 @@
 import { useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import authService from '@services/api/authService';
 import { isAuthRejection } from '@services/api/axiosInstance';
 import { useAuthStore } from '@store/authStore';
 import { ROUTES, STORAGE_KEYS, SESSION_TIMEOUT_MS } from '@constants/index';
+import { isCompletedAuth } from '@/types/auth';
 import type { LoginPayload } from '@/types/auth';
 
 // ── Idle tracking ─────────────────────────────────────────────────────────────
@@ -66,14 +68,40 @@ export function useLogin() {
   const mutation = useMutation({
     mutationFn: (credentials: LoginPayload) => authService.login(credentials),
     onSuccess: (data, variables) => {
-      if (data.requires2FA) {
-        // 2FA required — store pending state + redirect
-        setPendingTwoFactor(true, data.otpDestination);
-        navigate(ROUTES.TWO_FACTOR, { replace: true });
+      // Where the user was originally headed. Resolved up front so it survives
+      // the 2FA detour — the code screen forwards it on, rather than dumping
+      // everyone who uses 2FA on the dashboard.
+      //
+      // Router state first. ProtectedRoute puts the blocked path there when it
+      // redirects; the query param is only ever set by the axios interceptor's
+      // hard redirect to /session-expired. Reading the query alone — as this did
+      // — meant the state form was never seen and every login landed on the
+      // dashboard regardless of where the user was headed.
+      const fromState = (location.state as { returnTo?: string } | null)?.returnTo;
+      const fromQuery = new URLSearchParams(window.location.search).get('returnTo');
+      const returnTo = fromState ?? fromQuery ?? ROUTES.DASHBOARD;
+
+      // `requiresTwoFactor` — the server's spelling. This read `data.requires2FA`,
+      // which no response has ever contained, so the branch never fired and a
+      // 2FA login fell straight through to the setAuth below, dereferencing a
+      // `tokens` that isn't in a 2FA response. Every 2FA user hit a TypeError on
+      // the login page and could not get in at all.
+      if (data.requiresTwoFactor) {
+        // The temp token is the whole point: it is what authorises the verify
+        // call on the next screen.
+        setPendingTwoFactor(true, data.tempToken);
+        navigate(ROUTES.TWO_FACTOR, { replace: true, state: { returnTo } });
         return;
       }
 
-      // Full login success
+      // Full login success. Narrowed rather than asserted — AuthResponse now
+      // types these optional precisely because the 2FA branch omits them, and a
+      // malformed response should say so instead of throwing on a property read.
+      if (!isCompletedAuth(data)) {
+        toast.error('Unexpected response from the server. Please try again.');
+        return;
+      }
+
       setAuth(data.user, data.tokens.accessToken, data.organization, data.tokens.expiresIn);
 
       // Start the idle clock now — the first interaction that would otherwise
@@ -86,14 +114,7 @@ export function useLogin() {
         localStorage.setItem(STORAGE_KEYS.REMEMBER_ME, 'true');
       }
 
-      // Router state first. ProtectedRoute puts the blocked path there when it
-      // redirects; the query param is only ever set by the axios interceptor's
-      // hard redirect to /session-expired. Reading the query alone — as this did
-      // — meant the state form was never seen and every login landed on the
-      // dashboard regardless of where the user was headed.
-      const fromState = (location.state as { returnTo?: string } | null)?.returnTo;
-      const fromQuery = new URLSearchParams(window.location.search).get('returnTo');
-      navigate(fromState ?? fromQuery ?? ROUTES.DASHBOARD, { replace: true });
+      navigate(returnTo, { replace: true });
     },
   });
 

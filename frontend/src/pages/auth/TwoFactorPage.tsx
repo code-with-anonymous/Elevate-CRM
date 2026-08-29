@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useMutation } from '@tanstack/react-query';
 import AuthLayout from '@/components/auth/AuthLayout';
 import OtpInput from '@/components/auth/OtpInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/hooks/useAuth';
 import authService from '@/services/api/authService';
+import { markActivity } from '@/hooks/useAuthActions';
 import { useAuthStore } from '@/store/authStore';
 import { ROUTES, OTP_LENGTH } from '@/constants';
+import { isCompletedAuth } from '@/types/auth';
 import { AlertCircle, ShieldCheck } from 'lucide-react';
 
 export default function TwoFactorPage() {
@@ -17,20 +18,41 @@ export default function TwoFactorPage() {
   const [useBackupCode, setUseBackupCode] = useState(false);
   const [backupCode, setBackupCode] = useState('');
   const [serverError, setServerError] = useState<string | null>(null);
-  
+
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const tempToken = useAuthStore((s) => s.tempToken);
+  const pendingTwoFactor = useAuthStore((s) => s.pendingTwoFactor);
+
+  // Where login was originally headed, forwarded through the 2FA detour.
+  const returnTo =
+    (location.state as { returnTo?: string } | null)?.returnTo ?? ROUTES.DASHBOARD;
 
   const verifyMutation = useMutation({
-    mutationFn: (code: string) => authService.verify2FA(code),
+    // verifyOtp, NOT verify2FA.
+    //
+    // Two different endpoints that both take a 6-digit code:
+    //   /auth/2fa/verify  — completes SETUP. Returns a message, no tokens.
+    //   /auth/verify-otp  — completes LOGIN. Returns user + org + tokens and
+    //                       sets the refresh cookie. This is the one.
+    // This page called the first, so `data.tokens` was undefined and finishing a
+    // 2FA login threw instead of signing anyone in.
+    mutationFn: (code: string) => authService.verifyOtp({ code }),
     onSuccess: (data) => {
-      // Complete login process
+      if (!isCompletedAuth(data)) {
+        setServerError('Unexpected response from the server. Please sign in again.');
+        return;
+      }
+      // setAuth also clears pendingTwoFactor and the temp token.
       setAuth(data.user, data.tokens.accessToken, data.organization, data.tokens.expiresIn);
-      navigate(ROUTES.DASHBOARD, { replace: true });
+      markActivity();
+      navigate(returnTo, { replace: true });
     },
-    onError: (error: any) => {
-      setServerError(error?.response?.data?.message || 'Invalid code.');
+    onError: (error: unknown) => {
+      const message = (error as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
+      setServerError(message || 'Invalid code.');
       if (!useBackupCode) setOtp('');
     },
   });
@@ -44,13 +66,24 @@ export default function TwoFactorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otp, useBackupCode]);
 
+  // Below every hook, not above — an early return placed before useEffect
+  // changes the hook count between renders and React throws.
+  //
+  // The temp token lives in memory only, so a reload here drops it and there is
+  // nothing left to authenticate the verify call with. Send them back to sign in
+  // rather than presenting a form whose every submission would 401.
+  if (!pendingTwoFactor || !tempToken) {
+    return <Navigate to={ROUTES.LOGIN} replace state={{ returnTo }} />;
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setServerError(null);
     verifyMutation.mutate(useBackupCode ? backupCode : otp);
   };
 
-  const activeMethodName = user?.twoFactorMethod === 'SMS' ? 'SMS' : 'Authenticator App';
+  // 2FA is authenticator-app only — there is no SMS delivery in this product.
+  const activeMethodName = 'Authenticator App';
 
   return (
     <AuthLayout subtitle="Two-factor authentication is required">
@@ -75,7 +108,8 @@ export default function TwoFactorPage() {
           </p>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Enter one of your 8-character recovery backup codes.
+            Enter one of the recovery codes you saved when you turned on 2FA.
+            Each one works once.
           </p>
         )}
       </div>
@@ -93,12 +127,13 @@ export default function TwoFactorPage() {
           <div className="flex justify-center">
             <Input
               type="text"
-              placeholder="e.g. A1B2C3D4"
+              placeholder="e.g. K7PQ-3XMR"
               value={backupCode}
               onChange={(e) => setBackupCode(e.target.value.toUpperCase())}
               error={!!serverError}
               className="text-center font-mono tracking-widest uppercase"
-              maxLength={10}
+              maxLength={9}
+              autoComplete="one-time-code"
             />
           </div>
         )}

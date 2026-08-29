@@ -5,7 +5,7 @@
 
 const bcrypt   = require('bcryptjs');
 const UAParser = require('ua-parser-js');
-const { totp } = require('otplib');
+const { authenticator } = require('otplib');
 const QRCode   = require('qrcode');
 const crypto   = require('crypto');
 
@@ -19,6 +19,33 @@ const ApiError        = require('../utils/ApiError');
 const tokenService    = require('./token.service');
 const emailService    = require('./email.service');
 const { derivePermissions, roleLevel, normalizeRole } = require('../config/permissions');
+
+// ── TOTP configuration ────────────────────────────────────────────────────────
+//
+// `authenticator`, NOT `totp`. otplib v12 exports both, and they are different
+// classes that are easy to confuse and impossible to mix:
+//
+//   authenticator — base32 secrets, has generateSecret(). What Google
+//                   Authenticator, 1Password, Authy and every otpauth:// URI
+//                   actually speak.
+//   totp          — raw/ASCII secrets, NO generateSecret().
+//
+// This file used `totp` for all four 2FA operations. Two consequences:
+// `totp.generateSecret()` threw `TypeError: not a function` (a 500 on every
+// "Enable 2FA" click, and the secret was never persisted), and even patched,
+// `totp.check()` rejects an authenticator app's code for the same secret —
+// the two generate different digits. 2FA could never have been enabled.
+//
+// window: 1 accepts the adjacent 30-second step either side. Phone clocks drift
+// by a few seconds routinely; without this those users see "invalid code" for a
+// code that is, by their phone, correct. step/digits are already 30/6 by default.
+authenticator.options = { window: 1 };
+
+/**
+ * Lifetime of the half-finished-login token handed out between password and
+ * code. Short on purpose — it is a credential in flight, not a session.
+ */
+const TWO_FA_TEMP_TOKEN_EXPIRES = '5m';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -205,29 +232,18 @@ async function register({ orgName, firstName, lastName, email, password }, req) 
 async function login({ email, password }, req) {
   const ua = parseUA(req?.headers?.['user-agent']);
 
-  console.log("\n========== LOGIN DEBUG ==========");
-  console.log("Login Email:", email);
+  // NOTE: this function used to console.log the email, user id, verification
+  // token, expiry and the password-match result on every single login attempt.
+  // Render keeps those logs, so it amounted to a plaintext audit trail of who
+  // signs in and a live feed of e-mail verification tokens. Removed, not
+  // downgraded to debug — none of it belongs in a log at any level.
 
   // Find user with passwordHash
   const user = await User.findOne({
     email: email.toLowerCase(),
   }).select("+passwordHash");
 
-  console.log("User Found:", !!user);
-
-  if (user) {
-    console.log("User ID:", user._id.toString());
-    console.log("Email:", user.email);
-    console.log("isActive:", user.isActive);
-    console.log("isEmailVerified:", user.isEmailVerified);
-    console.log("is2FAEnabled:", user.is2FAEnabled);
-    console.log("Email Verify Token:", user.emailVerifyToken);
-    console.log("Email Verify Expiry:", user.emailVerifyExpiry);
-  }
-
   if (!user || !user.isActive) {
-    console.log("❌ Login Failed: User not found or inactive.");
-
     if (user) {
       await LoginHistory.create({
         userId: user._id,
@@ -249,11 +265,7 @@ async function login({ email, password }, req) {
     user.passwordHash
   );
 
-  console.log("Password Match:", passwordMatch);
-
   if (!passwordMatch) {
-    console.log("❌ Login Failed: Incorrect password.");
-
     await LoginHistory.create({
       userId: user._id,
       ipAddress: req?.ip,
@@ -269,35 +281,49 @@ async function login({ email, password }, req) {
   }
 
   if (!user.isEmailVerified) {
-    console.log("❌ Login Failed: Email is NOT verified.");
-    console.log("Current value:", user.isEmailVerified);
-    console.log("Stored Verify Token:", user.emailVerifyToken);
-    console.log("Token Expiry:", user.emailVerifyExpiry);
-
     throw ApiError.forbidden(
       "Please verify your email before logging in",
       "EMAIL_NOT_VERIFIED"
     );
   }
 
-  console.log("✅ Email is verified.");
-
   if (user.is2FAEnabled) {
-    console.log("🔐 2FA is enabled.");
-
-    const tempToken = tokenService.generateAccessToken({
-      sub: user._id.toString(),
-      organizationId: user.organizationId.toString(),
-      twoFAPending: true,
+    // The password was correct — that is half of the login, and it belongs in
+    // the history whether or not the second factor follows. This used to return
+    // before the LoginHistory.create below, so 2FA accounts (the ones most
+    // likely to care) had a permanently empty sign-in log.
+    await LoginHistory.create({
+      userId: user._id,
+      ipAddress: req?.ip,
+      userAgent: req?.headers?.['user-agent'],
+      ...ua,
+      status: "success",
     });
+
+    // Deliberately NOT a normal access token.
+    //
+    // `twoFAPending: true` marks this as a half-finished login, and verifyToken
+    // rejects it everywhere except /auth/verify-otp — see middleware/auth.js.
+    // Before that check existed this token was signed with the same secret and
+    // accepted by every protected route, so a password alone reached the whole
+    // API and the second factor was decorative.
+    //
+    // Five minutes, not the usual fifteen: its only job is to survive the walk
+    // to a phone and back.
+    const tempToken = tokenService.generateAccessToken(
+      {
+        sub: user._id.toString(),
+        organizationId: user.organizationId.toString(),
+        twoFAPending: true,
+      },
+      TWO_FA_TEMP_TOKEN_EXPIRES
+    );
 
     return {
       requiresTwoFactor: true,
       tempToken,
     };
   }
-
-  console.log("✅ Login successful.");
 
   // Update last login
   user.lastLogin = new Date();
@@ -314,8 +340,6 @@ async function login({ email, password }, req) {
   const org = await Organization.findById(user.organizationId);
   const { accessToken, refreshToken } = buildTokenPair(user);
   await tokenService.saveRefreshToken(user._id, refreshToken, req);
-
-  console.log("=================================\n");
 
   return {
     ...formatUser(user, org),
@@ -624,14 +648,37 @@ async function changePassword(userId, currentPassword, newPassword, rawRefreshTo
 
 // ── Verify OTP (2FA login completion) ─────────────────────────────────────────
 
+/**
+ * Complete a 2FA login. Accepts either a live TOTP code or one backup code.
+ */
 async function verifyOtp(userId, code, req) {
-  const user = await User.findById(userId).select('+twoFASecret');
+  const user = await User.findById(userId).select('+twoFASecret +twoFABackupCodes');
   if (!user || !user.is2FAEnabled || !user.twoFASecret) {
     throw ApiError.badRequest('2FA not enabled for this account', '2FA_NOT_ENABLED');
   }
 
-  totp.options = { step: 30, digits: 6 };
-  const valid  = totp.check(code, user.twoFASecret);
+  const submitted = String(code || '').trim();
+  let valid = authenticator.check(submitted, user.twoFASecret);
+
+  if (!valid) {
+    // Backup code fallback — the path for "my phone is gone".
+    //
+    // Compared against every UNUSED hash rather than short-circuiting, and each
+    // is marked usedAt on success, which is what makes them single-use. bcrypt
+    // is slow by design, so this loop is also why backup codes are worth rate
+    // limiting at the route (loginLimiter already covers /auth/login).
+    const normalized = normalizeBackupCode(submitted);
+
+    for (const entry of user.twoFABackupCodes) {
+      if (entry.usedAt) continue;
+      if (await bcrypt.compare(normalized, entry.hash)) {
+        entry.usedAt = new Date();
+        valid = true;
+        break;
+      }
+    }
+  }
+
   if (!valid) {
     throw ApiError.badRequest('Invalid OTP code', 'INVALID_OTP');
   }
@@ -655,18 +702,88 @@ async function verifyOtp(userId, code, req) {
 
 // ── 2FA Enable (generate secret + QR) ────────────────────────────────────────
 
+/**
+ * Number of single-use recovery codes issued at enrolment.
+ * They are the only way back in when the authenticator device is lost.
+ */
+const BACKUP_CODE_COUNT = 10;
+
+/**
+ * Generate the recovery codes.
+ *
+ * Returns the plaintext for one-time display AND bcrypt hashes for storage.
+ * The plaintext is never persisted — the same reasoning as passwords: a database
+ * leak must not hand over the 2FA bypass along with everything else.
+ *
+ * Format is `xxxx-xxxx` from an unambiguous alphabet (no 0/O/1/I/L) because
+ * people transcribe these by hand off a screenshot, months later, under stress.
+ */
+/**
+ * Put a typed backup code into the exact form that was hashed (`XXXX-XXXX`).
+ *
+ * People retype these from a screenshot or a printout: lowercase, with spaces,
+ * with or without the dash. Since only a hash is stored there is no way to
+ * compare loosely, so normalising here is the difference between a valid code
+ * working and a locked-out user being told it's invalid.
+ */
+function normalizeBackupCode(input) {
+  const bare = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return bare.length === 8 ? `${bare.slice(0, 4)}-${bare.slice(4)}` : bare;
+}
+
+async function generateBackupCodes() {
+  const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const plain = [];
+
+  for (let i = 0; i < BACKUP_CODE_COUNT; i++) {
+    const chars = Array.from(crypto.randomBytes(8))
+      .map((b) => ALPHABET[b % ALPHABET.length])
+      .join('');
+    plain.push(`${chars.slice(0, 4)}-${chars.slice(4)}`);
+  }
+
+  const hashed = await Promise.all(
+    plain.map(async (code) => ({
+      hash:   await bcrypt.hash(code, env.BCRYPT_ROUNDS),
+      usedAt: null,
+    }))
+  );
+
+  return { plain, hashed };
+}
+
 async function enable2FA(userId) {
-  const user   = await User.findById(userId);
+  const user = await User.findById(userId).select('+twoFASecret');
   if (!user) throw ApiError.notFound('User not found');
 
-  const secret    = totp.generateSecret();
-  const otpAuthUrl = totp.keyuri(user.email, 'ElevateCRM', secret);
+  // Re-issuing a secret to an already-protected account would silently
+  // invalidate the authenticator entry the user is relying on — and since
+  // disable2FA needs a working code, that locks them out of their own account.
+  // Turn it off first, deliberately, then re-enrol.
+  if (user.is2FAEnabled) {
+    throw ApiError.badRequest(
+      'Two-factor authentication is already enabled. Disable it before setting it up again.',
+      '2FA_ALREADY_ENABLED'
+    );
+  }
+
+  const secret     = authenticator.generateSecret();
+  const otpAuthUrl = authenticator.keyuri(user.email, 'ElevateCRM', secret);
   const qrCodeUrl  = await QRCode.toDataURL(otpAuthUrl);
 
-  // Store secret temporarily (not enabled until verified)
-  await User.findByIdAndUpdate(userId, { twoFASecret: secret });
+  const { plain, hashed } = await generateBackupCodes();
 
-  return { secret, qrCodeUrl };
+  // Secret and codes are staged, NOT active: is2FAEnabled stays false until
+  // verify2FA proves the user can actually read a code from their app. Enabling
+  // on this call would lock out anyone whose scan silently failed.
+  await User.findByIdAndUpdate(userId, {
+    twoFASecret:      secret,
+    twoFABackupCodes: hashed,
+  });
+
+  // `backupCodes` is returned exactly once, here. There is no endpoint to fetch
+  // them again — only to regenerate by re-enrolling.
+  return { secret, qrCodeUrl, backupCodes: plain };
 }
 
 // ── 2FA Verify (complete setup) ───────────────────────────────────────────────
@@ -677,9 +794,7 @@ async function verify2FA(userId, code) {
     throw ApiError.badRequest('2FA setup not initiated', '2FA_NOT_INITIATED');
   }
 
-  totp.options = { step: 30, digits: 6 };
-  const valid  = totp.check(code, user.twoFASecret);
-  if (!valid) {
+  if (!authenticator.check(code, user.twoFASecret)) {
     throw ApiError.badRequest('Invalid verification code', 'INVALID_OTP');
   }
 
@@ -689,20 +804,37 @@ async function verify2FA(userId, code) {
 
 // ── 2FA Disable ───────────────────────────────────────────────────────────────
 
-async function disable2FA(userId, code) {
-  const user = await User.findById(userId).select('+twoFASecret');
+/**
+ * Turn 2FA off. Requires BOTH the account password and a current code.
+ *
+ * The password requirement is the point: removing a protection should be harder
+ * than adding it. With a code alone, anyone who reaches a momentarily unlocked
+ * laptop can strip the second factor off the account in seconds — the session is
+ * already authenticated, and the authenticator app is usually on a phone sitting
+ * right there. Same stance as GitHub, Google and Stripe.
+ */
+async function disable2FA(userId, code, password) {
+  const user = await User.findById(userId).select('+twoFASecret +passwordHash');
   if (!user || !user.is2FAEnabled || !user.twoFASecret) {
     throw ApiError.badRequest('2FA is not enabled', '2FA_NOT_ENABLED');
   }
 
-  totp.options = { step: 30, digits: 6 };
-  const valid  = totp.check(code, user.twoFASecret);
-  if (!valid) {
+  // Password first: a wrong password should not reveal whether the code was
+  // right, and this is the cheaper check to fail.
+  const passwordMatches = await bcrypt.compare(password || '', user.passwordHash);
+  if (!passwordMatches) {
+    throw ApiError.badRequest('Incorrect password', 'INVALID_PASSWORD');
+  }
+
+  if (!authenticator.check(code, user.twoFASecret)) {
     throw ApiError.badRequest('Invalid verification code', 'INVALID_OTP');
   }
 
-  user.is2FAEnabled = false;
-  user.twoFASecret  = null;
+  user.is2FAEnabled     = false;
+  user.twoFASecret      = null;
+  // Drop the recovery codes with the secret. Leaving them behind would mean a
+  // later re-enrolment silently inherits codes the user believes are retired.
+  user.twoFABackupCodes = [];
   await user.save();
 }
 
@@ -886,24 +1018,49 @@ async function getLoginHistory(userId, page = 1, limit = 20) {
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
-async function getSessions(userId) {
+/**
+ * Active sessions for the security page.
+ *
+ * @param {string} userId
+ * @param {object} [req] The caller's request — used only to identify which row
+ *   is the caller's own session, by hashing their refresh cookie.
+ *
+ * This used to hardcode device/browser/os to 'Unknown' and isCurrent to false,
+ * even though RefreshToken.userAgent holds the real string and parseUA() has
+ * been sitting at the top of this file the whole time. Every row read "Unknown
+ * on Unknown", so Revoke was a guess — and the one row you must not revoke, your
+ * own, was indistinguishable from the rest.
+ */
+async function getSessions(userId, req) {
   const tokens = await RefreshToken.find({
     userId,
     isRevoked:  false,
     expiresAt:  { $gt: new Date() },
   }).sort({ createdAt: -1 });
 
-  return tokens.map((t) => ({
-    id:         t._id.toString(),
-    device:     'Unknown',
-    browser:    'Unknown',
-    os:         'Unknown',
-    ip:         t.ipAddress || 'Unknown',
-    location:   null,
-    lastActive: t.updatedAt,
-    createdAt:  t.createdAt,
-    isCurrent:  false,
-  }));
+  // The refresh token is httpOnly, so the browser sends it without the page
+  // ever seeing it; only its hash is stored. Hashing the incoming cookie and
+  // matching is how "this device" can be identified without trusting anything
+  // the client claims about itself.
+  const currentHash = req?.cookies?.refreshToken
+    ? tokenService.hashToken(req.cookies.refreshToken)
+    : null;
+
+  return tokens.map((t) => {
+    const ua = parseUA(t.userAgent);
+
+    return {
+      id:         t._id.toString(),
+      device:     ua.device,
+      browser:    ua.browser,
+      os:         ua.os,
+      ip:         t.ipAddress || 'Unknown',
+      location:   null,
+      lastActive: t.updatedAt,
+      createdAt:  t.createdAt,
+      isCurrent:  Boolean(currentHash && t.token === currentHash),
+    };
+  });
 }
 
 async function revokeSession(sessionId, userId) {

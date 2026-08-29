@@ -18,13 +18,6 @@ export enum TwoFactorMethod {
   SMS = 'SMS',
 }
 
-export enum OtpContext {
-  REGISTRATION = 'REGISTRATION',
-  LOGIN = 'LOGIN',
-  PHONE_VERIFICATION = 'PHONE_VERIFICATION',
-  PASSWORD_RESET = 'PASSWORD_RESET',
-}
-
 export enum OrgPlan {
   FREE = 'FREE',
   STARTER = 'STARTER',
@@ -74,14 +67,53 @@ export interface AuthTokens {
 
 // ── Auth Response ─────────────────────────────────────────────────────────────
 
+/**
+ * Response to POST /auth/login (and register / accept-invite / verify-otp).
+ *
+ * When 2FA is on, the server answers with ONLY `requiresTwoFactor` and
+ * `tempToken` — `user`, `organization` and `tokens` are all absent. That's why
+ * they're optional here: typing them as required is what let
+ * `setAuth(data.user, data.tokens.accessToken, ...)` compile against a response
+ * that has neither, and crash at runtime for every 2FA user.
+ */
 export interface AuthResponse {
+  user?: User;
+  organization?: Organization;
+  tokens?: AuthTokens;
+  /**
+   * True when the password was accepted but a second factor is still needed.
+   *
+   * NOTE the name. This was `requires2FA` on the client while the server has
+   * always sent `requiresTwoFactor` — so the check was permanently `undefined`,
+   * the 2FA branch never ran, and login fell through to dereferencing the
+   * absent `tokens`. A 2FA-enabled account simply could not sign in.
+   */
+  requiresTwoFactor?: boolean;
+  /**
+   * Short-lived (5 min) half-finished-login token. Carries `twoFAPending: true`
+   * and is accepted by exactly one endpoint, POST /auth/verify-otp.
+   * Hold it in memory only — it is a credential in flight.
+   */
+  tempToken?: string;
+}
+
+/** An AuthResponse that actually completed a sign-in. */
+export interface CompletedAuthResponse extends AuthResponse {
   user: User;
   organization: Organization;
   tokens: AuthTokens;
-  /** true when 2FA is required to complete login */
-  requires2FA?: boolean;
-  /** masked phone/email for OTP destination display */
-  otpDestination?: string;
+}
+
+/**
+ * Narrow an AuthResponse to one carrying a real session.
+ *
+ * Every caller of setAuth needs this. The 2FA branch returns a response with no
+ * user, organization or tokens, and the previous type claimed all three were
+ * always present — so `data.tokens.accessToken` type-checked and then threw.
+ * Prefer this over `!` or a cast: the whole point is that the absence is real.
+ */
+export function isCompletedAuth(res: AuthResponse): res is CompletedAuthResponse {
+  return Boolean(res.user && res.organization && res.tokens);
 }
 
 // ── Request Payloads ──────────────────────────────────────────────────────────
@@ -119,10 +151,19 @@ export interface ChangePasswordPayload {
   confirmNewPassword: string;
 }
 
+/**
+ * Payload for POST /auth/verify-otp — completing a 2FA login.
+ *
+ * Just the code. The account is identified by the `tempToken` Bearer, not by
+ * anything in the body. This used to carry `identifier` and `context` for an
+ * email/SMS OTP flow that was never built: the server reads neither, and the
+ * only caller hardcoded `context: PHONE_VERIFICATION` with a "assuming default
+ * for now" comment.
+ *
+ * `code` accepts either a 6-digit authenticator code or a backup code.
+ */
 export interface OtpPayload {
   code: string;
-  identifier: string;
-  context: OtpContext;
 }
 
 export interface AcceptInvitePayload {
@@ -227,10 +268,18 @@ export interface AuthState {
   permissions: string[];
   role: UserRole;
   sessionExpiry: number | null;
-  /** true after login, but before 2FA is completed */
+  /** true after the password is accepted, but before the 2FA code is */
   pendingTwoFactor: boolean;
-  /** masked destination for OTP (e.g., "***@gmail.com" or "+1***5678") */
-  otpDestination: string | null;
+  /**
+   * The half-finished-login token, held in memory ONLY — never persisted,
+   * exactly like `accessToken`. Sent as the Bearer for POST /auth/verify-otp,
+   * which is the one endpoint that accepts it.
+   *
+   * Replaces `otpDestination`, which described a masked email/SMS destination
+   * for a delivery channel this product doesn't have: nothing ever set it, and
+   * the 2FA method is an authenticator app, which has no destination to show.
+   */
+  tempToken: string | null;
 }
 
 export interface AuthActions {
@@ -240,7 +289,8 @@ export interface AuthActions {
   setPermissions: (permissions: string[]) => void;
   hasPermission: (permission: string) => boolean;
   hasRole: (role: UserRole) => boolean;
-  setPendingTwoFactor: (pending: boolean, destination?: string) => void;
+  /** Enter the pending-2FA state, holding the temp token for the verify call. */
+  setPendingTwoFactor: (pending: boolean, tempToken?: string | null) => void;
   setLoading: (loading: boolean) => void;
 }
 

@@ -32,6 +32,7 @@ import { useAuthStore } from '@/store/authStore';
 import { formatRelative } from '@/lib/dayjs';
 import { DURATION, EASE_OUT } from '@/lib/motion';
 import { cn } from '@/lib/cn';
+import type { TwoFactorSetupResponse } from '@/types/auth';
 
 const SECURITY_QK = {
   sessions: ['auth', 'sessions'] as const,
@@ -59,22 +60,30 @@ export default function SecuritySettings() {
   const updateUser = useAuthStore((s) => s.updateUser);
 
   // ── 2FA ─────────────────────────────────────────────────────────────────────
-  const twoFAEnabled = Boolean(
-    (user as unknown as { isTwoFAEnabled?: boolean; twoFactorEnabled?: boolean })
-      ?.isTwoFAEnabled ??
-      (user as unknown as { twoFactorEnabled?: boolean })?.twoFactorEnabled
-  );
+  //
+  // `is2FAEnabled` — the real field, on the User type, on the Mongoose model,
+  // and in formatUser's payload. This read `isTwoFAEnabled ?? twoFactorEnabled`
+  // through an `as unknown as` cast; neither key has ever existed, so the value
+  // was permanently false: the card always said "Not enabled" and the entire
+  // Disable block below was unreachable even with 2FA on. The cast is gone, so
+  // a future rename fails the build instead of silently reading undefined.
+  const twoFAEnabled = Boolean(user?.is2FAEnabled);
 
   // Setup is a two-step handshake: enable() returns a secret + QR, and the
   // secret isn't active until verify() confirms the user can actually read a
   // code from it. Skipping step two locks people out of their own account.
-  const [setup, setSetup] = useState<{ qrCode?: string; secret?: string } | null>(null);
+  const [setup, setSetup] = useState<TwoFactorSetupResponse | null>(null);
+  const [savedCodes, setSavedCodes] = useState(false);
   const [code, setCode] = useState('');
   const [disarmCode, setDisarmCode] = useState('');
+  const [disarmPassword, setDisarmPassword] = useState('');
 
   const beginSetup = useMutation({
     mutationFn: () => authService.enable2FA(),
-    onSuccess: (data) => setSetup(data as { qrCode?: string; secret?: string }),
+    onSuccess: (data) => {
+      setSetup(data);
+      setSavedCodes(false);
+    },
     onError: (err) => toast.error(errorMessage(err, 'Could not start 2FA setup')),
   });
 
@@ -84,17 +93,18 @@ export default function SecuritySettings() {
       toast.success('Two-factor authentication is on');
       setSetup(null);
       setCode('');
-      updateUser({ isTwoFAEnabled: true } as never);
+      updateUser({ is2FAEnabled: true });
     },
     onError: (err) => toast.error(errorMessage(err, 'That code didn’t match — try again')),
   });
 
   const disable2FA = useMutation({
-    mutationFn: () => authService.disable2FA(disarmCode.trim()),
+    mutationFn: () => authService.disable2FA(disarmCode.trim(), disarmPassword),
     onSuccess: () => {
       toast.success('Two-factor authentication is off');
       setDisarmCode('');
-      updateUser({ isTwoFAEnabled: false } as never);
+      setDisarmPassword('');
+      updateUser({ is2FAEnabled: false });
     },
     onError: (err) => toast.error(errorMessage(err, 'That code didn’t match')),
   });
@@ -172,9 +182,12 @@ export default function SecuritySettings() {
               className="overflow-hidden"
             >
               <div className="mt-5 flex flex-wrap items-start gap-5 rounded-lg border border-border/60 bg-muted/25 p-4">
-                {setup.qrCode && (
+                {/* `qrCodeUrl` — the field the server actually sends. This read
+                    `setup.qrCode`, which is why no QR ever appeared and the only
+                    way to enrol was retyping the secret by hand. */}
+                {setup.qrCodeUrl && (
                   <img
-                    src={setup.qrCode}
+                    src={setup.qrCodeUrl}
                     alt="Two-factor QR code"
                     className="h-36 w-36 shrink-0 rounded-lg border border-border/60 bg-white p-1.5"
                   />
@@ -202,11 +215,56 @@ export default function SecuritySettings() {
                       className={cn(controlClass, 'max-w-[140px] font-mono tracking-[0.2em]')}
                     />
                   </Field>
+
+                  {/* Recovery codes. Shown here and NOWHERE else, ever — the
+                      server stores only bcrypt hashes, so this render is the
+                      single moment they exist in readable form. Hence the
+                      explicit "I've saved these" gate rather than a passive
+                      notice: without it the likeliest outcome is a user who
+                      scrolls past, loses their phone, and loses the account. */}
+                  {setup.backupCodes?.length > 0 && (
+                    <div className="rounded-lg border border-status-warning/40 bg-status-warning/5 p-3">
+                      <p className="text-[12px] font-medium text-foreground">
+                        Save your recovery codes
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Each works once, if you lose your phone. You won’t be shown these again.
+                      </p>
+                      <ul className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[12px] text-foreground">
+                        {setup.backupCodes.map((c) => (
+                          <li key={c}>{c}</li>
+                        ))}
+                      </ul>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            void navigator.clipboard
+                              ?.writeText(setup.backupCodes.join('\n'))
+                              .then(() => toast.success('Recovery codes copied'))
+                              .catch(() => toast.error('Couldn’t copy — select and copy them manually'));
+                          }}
+                        >
+                          Copy codes
+                        </Button>
+                        <label className="flex items-center gap-2 text-[12px] text-foreground">
+                          <input
+                            type="checkbox"
+                            checked={savedCodes}
+                            onChange={(e) => setSavedCodes(e.target.checked)}
+                            className="h-3.5 w-3.5 rounded border-border"
+                          />
+                          I’ve saved these somewhere safe
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     <Button
                       onClick={() => confirmSetup.mutate()}
                       isLoading={confirmSetup.isPending}
-                      disabled={code.length !== 6}
+                      disabled={code.length !== 6 || !savedCodes}
                     >
                       Confirm and enable
                     </Button>
@@ -215,6 +273,7 @@ export default function SecuritySettings() {
                       onClick={() => {
                         setSetup(null);
                         setCode('');
+                        setSavedCodes(false);
                       }}
                     >
                       Cancel
@@ -229,14 +288,17 @@ export default function SecuritySettings() {
           )}
         </AnimatePresence>
 
-        {/* Disabling also requires a code — otherwise anyone with a hijacked
-            session could switch off the very thing protecting the account. */}
+        {/* Disabling requires a code AND the password.
+            Turning protection off is the dangerous direction, so it asks for
+            more than turning it on did: with a code alone, a momentarily
+            unlocked laptop is enough to strip the second factor — the session
+            is already signed in and the phone is usually right there. */}
         {twoFAEnabled && (
           <div className="mt-5 flex flex-wrap items-end gap-3 rounded-lg border border-border/60 bg-muted/25 p-4">
             <Field
               label="Current code"
               htmlFor="disarmCode"
-              hint="Required to turn 2FA off."
+              hint="From your authenticator app."
               className="min-w-[160px]"
             >
               <input
@@ -249,11 +311,27 @@ export default function SecuritySettings() {
                 className={cn(controlClass, 'max-w-[140px] font-mono tracking-[0.2em]')}
               />
             </Field>
+            <Field
+              label="Your password"
+              htmlFor="disarmPassword"
+              hint="Confirms it’s really you."
+              className="min-w-[200px]"
+            >
+              <input
+                id="disarmPassword"
+                type="password"
+                autoComplete="current-password"
+                value={disarmPassword}
+                onChange={(e) => setDisarmPassword(e.target.value)}
+                placeholder="••••••••"
+                className={cn(controlClass, 'max-w-[220px]')}
+              />
+            </Field>
             <Button
               variant="destructive"
               onClick={() => disable2FA.mutate()}
               isLoading={disable2FA.isPending}
-              disabled={disarmCode.length !== 6}
+              disabled={disarmCode.length !== 6 || disarmPassword.length === 0}
             >
               <ShieldOff size={14} />
               Disable 2FA

@@ -14,11 +14,16 @@ const ApiError     = require('../utils/ApiError');
 /**
  * Generate a short-lived access token.
  * Payload: { sub, role, organizationId }
+ *
+ * @param {object} payload
+ * @param {string} [expiresIn] Override the default lifetime. Used for the
+ *   two-factor temp token, which should live minutes rather than the full
+ *   access-token window — it only has to survive reaching for a phone.
  * @returns {string} signed JWT
  */
-function generateAccessToken(payload) {
+function generateAccessToken(payload, expiresIn) {
   return jwt.sign(payload, env.ACCESS_TOKEN_SECRET, {
-    expiresIn: env.ACCESS_TOKEN_EXPIRES,
+    expiresIn: expiresIn || env.ACCESS_TOKEN_EXPIRES,
     issuer:    'elevate-crm',
   });
 }

@@ -8,7 +8,7 @@ const { body, param } = require('express-validator');
 
 const ctrl       = require('../controllers/auth.controller');
 const validate   = require('../middleware/validate');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, verifyPendingToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const {
   loginLimiter,
@@ -170,10 +170,17 @@ router.post(
   ctrl.changePassword
 );
 
-// POST /api/auth/verify-otp  (protected partial — accepts tempToken)
+// POST /api/auth/verify-otp — completes a 2FA login.
+//
+// verifyPendingToken, not verifyToken: this is the ONE route that accepts the
+// half-finished-login tempToken, and it refuses ordinary access tokens. The
+// comment here always said "accepts tempToken"; the middleware never enforced
+// either half of that.
+//
+// Accepts a live authenticator code or a single-use backup code.
 router.post(
   '/verify-otp',
-  verifyToken,
+  verifyPendingToken,
   [body('code').trim().notEmpty().withMessage('OTP code is required')],
   validate,
   ctrl.verifyOtp
@@ -192,10 +199,17 @@ router.post(
 );
 
 // POST /api/auth/2fa/disable
+//
+// Password AND code. Turning the protection off is the dangerous direction, so
+// it asks for more than turning it on: a code alone means a momentarily
+// unlocked laptop is enough to strip the second factor.
 router.post(
   '/2fa/disable',
   verifyToken,
-  [body('code').trim().notEmpty().withMessage('Verification code is required')],
+  [
+    body('code').trim().notEmpty().withMessage('Verification code is required'),
+    body('password').notEmpty().withMessage('Your password is required to disable 2FA'),
+  ],
   validate,
   ctrl.disable2FA
 );

@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label';
 import { acceptInviteSchema, type AcceptInviteFormValues } from '@/schemas/authSchemas';
 import authService from '@/services/api/authService';
 import { useAuthStore } from '@/store/authStore';
+import { markActivity } from '@/hooks/useAuthActions';
+import { isCompletedAuth } from '@/types/auth';
 import { ROUTES } from '@/constants';
 import { AlertCircle, XCircle } from 'lucide-react';
 
@@ -34,7 +36,12 @@ export default function AcceptInvitePage() {
     mutationFn: (data: AcceptInviteFormValues & { token: string }) => authService.acceptInvite(data),
     onSuccess: (data) => {
       // Auto-login
+      if (!isCompletedAuth(data)) {
+        setServerError('Unexpected response from the server. Please try signing in.');
+        return;
+      }
       setAuth(data.user, data.tokens.accessToken, data.organization, data.tokens.expiresIn);
+      markActivity();
       navigate(ROUTES.DASHBOARD, { replace: true });
     },
     onError: (error: any) => {

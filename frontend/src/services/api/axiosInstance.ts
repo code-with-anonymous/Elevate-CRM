@@ -177,7 +177,14 @@ export function warmUpApi(): void {
 
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    const token = useAuthStore.getState().accessToken;
+    const { accessToken, tempToken } = useAuthStore.getState();
+
+    // Fall back to the 2FA temp token when there is no real one. Between the
+    // password and the code there IS no access token, so without this the
+    // /auth/verify-otp call goes out unauthenticated and 401s — the 2FA page
+    // renders but cannot submit. The server only honours this token on that one
+    // endpoint (verifyPendingToken), so a wider fallback is safe.
+    const token = accessToken ?? tempToken;
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;

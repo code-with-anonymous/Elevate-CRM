@@ -76,7 +76,10 @@ export const useAuthStore = create<AuthStoreInternal>()(
       role: DEFAULT_ROLE,
       sessionExpiry: null,
       pendingTwoFactor: false,
-      otpDestination: null,
+      // In-memory only, NOT persisted — same rule as accessToken. It is a live
+      // credential, and a reload dropping it is the correct outcome: the user
+      // returns to /login rather than the token outliving the tab.
+      tempToken: null,
 
       // Boot begins mid-restore. useAppBootstrap flips this to 'ready' exactly
       // once, in a finally, whatever the outcome — so a thrown refresh can never
@@ -106,8 +109,11 @@ export const useAuthStore = create<AuthStoreInternal>()(
           permissions: user.permissions ?? [],
           role: normalizeRole(user.role),
           sessionExpiry: expiry,
+          // The 2FA leg is over — a real token exists now, so the temp one must
+          // not linger. Leaving it set would keep the axios fallback willing to
+          // send a spent credential.
           pendingTwoFactor: false,
-          otpDestination: null,
+          tempToken: null,
         });
       },
 
@@ -125,7 +131,7 @@ export const useAuthStore = create<AuthStoreInternal>()(
           role: DEFAULT_ROLE,
           sessionExpiry: null,
           pendingTwoFactor: false,
-          otpDestination: null,
+          tempToken: null,
           // Releases the loading gate. A cleared session is a decided one — the
           // guards should redirect to /login now, not keep showing a spinner.
           authStatus: 'ready',
@@ -188,12 +194,14 @@ export const useAuthStore = create<AuthStoreInternal>()(
       },
 
       /**
-       * Set pending 2FA state (login initiated but 2FA not yet verified)
+       * Enter (or leave) the pending-2FA state: the password was accepted, the
+       * code has not been. `tempToken` is the credential that authorises the
+       * verify call — without it the /2fa page can render but not submit.
        */
-      setPendingTwoFactor: (pending: boolean, destination?: string): void => {
+      setPendingTwoFactor: (pending: boolean, tempToken?: string | null): void => {
         set({
           pendingTwoFactor: pending,
-          otpDestination: destination ?? null,
+          tempToken: tempToken ?? null,
         });
       },
 
@@ -249,6 +257,6 @@ export const selectPermissions = (state: AuthStoreInternal): string[] => state.p
 export const selectRole = (state: AuthStoreInternal): UserRole => state.role;
 export const selectAccessToken = (state: AuthStoreInternal): string | null => state.accessToken;
 export const selectPendingTwoFactor = (state: AuthStoreInternal): boolean => state.pendingTwoFactor;
-export const selectOtpDestination = (state: AuthStoreInternal): string | null => state.otpDestination;
+export const selectTempToken = (state: AuthStoreInternal): string | null => state.tempToken;
 export const selectSessionExpiry = (state: AuthStoreInternal): number | null => state.sessionExpiry;
 export const selectAuthStatus = (state: AuthStoreInternal): AuthStatus => state.authStatus;

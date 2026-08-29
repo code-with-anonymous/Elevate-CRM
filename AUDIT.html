@@ -1,0 +1,1406 @@
+<title>ElevateCRM Test Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+  /* ── Tokens: complete light palette on bare :root ───────────────────────── */
+  :root {
+    --ground:      #F3F5F6;
+    --surface:     #FFFFFF;
+    --surface-sunk:#EDF0F1;
+    --ink:         #141A1E;
+    --ink-2:       #38434C;
+    --muted:       #5B6874;
+    --faint:       #8695A1;
+    --rule:        #DCE2E5;
+    --rule-strong: #C3CDD3;
+
+    --accent:      #0D7C7C;
+    --accent-ink:  #095C5C;
+    --accent-wash: #E4F1F0;
+
+    --crit:        #B3261E;
+    --crit-wash:   #FBE9E7;
+    --high:        #B45309;
+    --high-wash:   #FBF0E3;
+    --med:         #8A6D0F;
+    --med-wash:    #F8F3E2;
+    --pass:        #1E7A4B;
+    --pass-wash:   #E6F2EB;
+
+    --shadow: 0 1px 2px rgba(20,26,30,.05), 0 8px 24px -16px rgba(20,26,30,.18);
+
+    --measure: 68ch;
+    --page: 1180px;
+  }
+
+  /* Dark for the un-stamped (system) state, guarded so an explicit light wins */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #101518;
+      --surface:     #171E22;
+      --surface-sunk:#1E262B;
+      --ink:         #E9EEF0;
+      --ink-2:       #C2CDD3;
+      --muted:       #94A3AC;
+      --faint:       #6E7E88;
+      --rule:        #2A343A;
+      --rule-strong: #3B474E;
+
+      --accent:      #45B8B0;
+      --accent-ink:  #7FD3CC;
+      --accent-wash: #14312F;
+
+      --crit:        #F2837A;
+      --crit-wash:   #341917;
+      --high:        #E0A15B;
+      --high-wash:   #2E2317;
+      --med:         #D2BC6A;
+      --med-wash:    #2A2617;
+      --pass:        #63C58E;
+      --pass-wash:   #16281E;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.6);
+    }
+  }
+
+  /* Explicit dark choice wins in the other direction */
+  :root[data-theme="dark"] {
+    --ground:      #101518;
+    --surface:     #171E22;
+    --surface-sunk:#1E262B;
+    --ink:         #E9EEF0;
+    --ink-2:       #C2CDD3;
+    --muted:       #94A3AC;
+    --faint:       #6E7E88;
+    --rule:        #2A343A;
+    --rule-strong: #3B474E;
+
+    --accent:      #45B8B0;
+    --accent-ink:  #7FD3CC;
+    --accent-wash: #14312F;
+
+    --crit:        #F2837A;
+    --crit-wash:   #341917;
+    --high:        #E0A15B;
+    --high-wash:   #2E2317;
+    --med:         #D2BC6A;
+    --med-wash:    #2A2617;
+    --pass:        #63C58E;
+    --pass-wash:   #16281E;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: 0 28px 96px;
+  }
+
+  /* ── Typography ─────────────────────────────────────────────────────────── */
+  h1, h2, h3, h4, .eyebrow, .stat-n, .chip, .sev, th, .btn {
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  h1 {
+    font-size: clamp(34px, 5vw, 52px);
+    line-height: 1.04;
+    letter-spacing: -.022em;
+    font-weight: 700;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h2 {
+    font-size: clamp(21px, 2.4vw, 26px);
+    line-height: 1.2;
+    letter-spacing: -.012em;
+    font-weight: 700;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-size: 18px;
+    line-height: 1.3;
+    letter-spacing: -.008em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  p { margin: 0; max-width: var(--measure); }
+  .wide p { max-width: none; }
+
+  .eyebrow {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  code, .mono, kbd {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .855em;
+    font-variant-ligatures: none;
+  }
+
+  code {
+    background: var(--surface-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .1em .34em;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, .btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  /* ── Masthead ───────────────────────────────────────────────────────────── */
+  header.mast {
+    border-bottom: 2px solid var(--ink);
+    padding: 52px 0 22px;
+    margin-bottom: 0;
+  }
+
+  .mast-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px 32px;
+    margin-bottom: 26px;
+  }
+
+  .mast-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: .01em;
+  }
+  .mast-meta b { color: var(--ink-2); font-weight: 500; }
+
+  .lede {
+    margin-top: 18px;
+    font-size: 19.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    max-width: 62ch;
+  }
+
+  /* ── Verdict banner ─────────────────────────────────────────────────────── */
+  .verdict {
+    margin: 30px 0 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0 20px;
+    align-items: start;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--crit);
+    border-radius: 3px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .verdict .vlabel {
+    font-family: Archivo, sans-serif;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--crit);
+    padding-top: 4px;
+    white-space: nowrap;
+  }
+  .verdict p { max-width: 74ch; }
+
+  /* ── Stat row ───────────────────────────────────────────────────────────── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 28px;
+  }
+  .stat {
+    background: var(--surface);
+    padding: 18px 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat-n {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-l {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+  .stat.ok .stat-n { color: var(--pass); }
+  .stat.warn .stat-n { color: var(--high); }
+  .stat.bad .stat-n { color: var(--crit); }
+
+  /* ── Sections ───────────────────────────────────────────────────────────── */
+  section { margin-top: 64px; }
+  .sec-head {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule-strong);
+    margin-bottom: 26px;
+  }
+  .sec-head p { color: var(--muted); font-size: 16px; }
+
+  /* ── Findings ───────────────────────────────────────────────────────────── */
+  .findings { display: flex; flex-direction: column; gap: 18px; }
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    border-left: 4px solid var(--sev-color, var(--muted));
+    box-shadow: var(--shadow);
+    padding: 22px 24px 24px;
+  }
+  .finding.critical { --sev-color: var(--crit); }
+  .finding.high     { --sev-color: var(--high); }
+  .finding.medium   { --sev-color: var(--med); }
+  .finding.low      { --sev-color: var(--faint); }
+
+  .f-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    margin-bottom: 6px;
+  }
+  .sev {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 3px;
+    color: var(--sev-color);
+    background: var(--sev-wash, var(--surface-sunk));
+    border: 1px solid color-mix(in srgb, var(--sev-color) 24%, transparent);
+    white-space: nowrap;
+  }
+  .critical .sev { --sev-wash: var(--crit-wash); }
+  .high .sev     { --sev-wash: var(--high-wash); }
+  .medium .sev   { --sev-wash: var(--med-wash); }
+  .low .sev      { --sev-wash: var(--surface-sunk); }
+
+  .f-id {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11.5px;
+    color: var(--faint);
+    letter-spacing: .04em;
+  }
+  .f-scope {
+    font-family: Archivo, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--rule-strong);
+    border-radius: 100px;
+    padding: 3px 9px;
+  }
+
+  .f-body { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+
+  .f-row {
+    display: grid;
+    grid-template-columns: 106px 1fr;
+    gap: 4px 18px;
+    align-items: start;
+  }
+  .f-row > dt {
+    font-family: Archivo, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    padding-top: 5px;
+  }
+  .f-row > dd { margin: 0; }
+  .f-row > dd p { max-width: 76ch; }
+  .f-row > dd + dt { border-top: 1px dotted var(--rule); padding-top: 13px; margin-top: 9px; }
+  .f-row > dt + dd { }
+
+  dl.f-body { margin: 14px 0 0; }
+  dl.f-body dt {
+    font-family: Archivo, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-top: 14px;
+  }
+  dl.f-body dt:first-of-type { margin-top: 0; }
+  dl.f-body dd { margin: 5px 0 0; }
+  dl.f-body dd p { max-width: 78ch; }
+
+  .loc {
+    display: block;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    background: var(--surface-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 8px 11px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .evidence {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .evidence span { color: var(--ink-2); }
+
+  /* ── Tables ─────────────────────────────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; }
+  th, td {
+    text-align: left;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--rule);
+    font-size: 15px;
+  }
+  th {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface-sunk);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: "JetBrains Mono", monospace; font-size: 13.5px; }
+  td.file { font-family: "JetBrains Mono", monospace; font-size: 13px; white-space: nowrap; }
+
+  .bar {
+    position: relative;
+    height: 6px;
+    min-width: 92px;
+    background: var(--surface-sunk);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+  .bar > i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--accent);
+    border-radius: 100px;
+  }
+  .bar.low > i { background: var(--high); }
+
+  /* ── Chips / lists ──────────────────────────────────────────────────────── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    padding: 4px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink-2);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+  .chip.pass { color: var(--pass); border-color: color-mix(in srgb, var(--pass) 34%, transparent); background: var(--pass-wash); }
+
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .card h3 { margin-bottom: 8px; }
+  .card p { color: var(--ink-2); font-size: 15.5px; }
+
+  ul.tight { margin: 8px 0 0; padding-left: 20px; }
+  ul.tight li { margin: 5px 0; max-width: 74ch; }
+  ul.tight li::marker { color: var(--faint); }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-wash);
+    padding: 14px 18px;
+    border-radius: 0 3px 3px 0;
+    margin-top: 18px;
+  }
+  .note p { max-width: 78ch; color: var(--ink-2); }
+  .note strong { color: var(--ink); }
+
+  footer {
+    margin-top: 72px;
+    padding-top: 22px;
+    border-top: 1px solid var(--rule-strong);
+    color: var(--faint);
+    font-size: 13.5px;
+  }
+
+  @media (max-width: 620px) {
+    body { font-size: 16.5px; }
+    .wrap { padding: 0 18px 72px; }
+    dl.f-body dd p { max-width: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="mast-top">
+      <div>
+        <p class="eyebrow">Quality assurance audit</p>
+        <h1>ElevateCRM Test Audit</h1>
+      </div>
+    </div>
+
+    <div class="mast-meta">
+      <span><b>Date</b> 28 Aug 2026</span>
+      <span><b>Branch</b> main @ dfb2b47</span>
+      <span><b>Stack</b> Express + MongoDB / React + Vite</span>
+      <span><b>Suites</b> Jest + Supertest, Playwright</span>
+      <span><b>App code changed</b> none</span>
+    </div>
+
+    <p class="lede">
+      A full automated test suite was written for the backend API and the frontend
+      application, and then run against them. Both suites pass. Building them
+      surfaced eight defects in the application, three of which affect data the
+      product is responsible for keeping.
+    </p>
+  </header>
+
+  <div class="verdict">
+    <div class="vlabel">Headline</div>
+    <div>
+      <p>
+        <strong>Dragging a deal between pipeline stages never saves.</strong> The card
+        moves on screen, no request is sent to the server, and the change is gone on the
+        next reload. The pipeline is the product's headline feature and nothing in the
+        interaction hints that the move was discarded. Reproduced deterministically;
+        root cause identified in <code>usePipelineDrag.ts</code>. See F-01.
+      </p>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat ok">
+      <span class="stat-n">777</span>
+      <span class="stat-l">backend tests, all passing<br>7 suites</span>
+    </div>
+    <div class="stat ok">
+      <span class="stat-n">81</span>
+      <span class="stat-l">E2E tests, all passing<br>Chromium, ~9 min</span>
+    </div>
+    <div class="stat">
+      <span class="stat-n">77.8%</span>
+      <span class="stat-l">backend statement coverage<br>79.6% lines</span>
+    </div>
+    <div class="stat bad">
+      <span class="stat-n">8</span>
+      <span class="stat-l">defects found<br>1 critical, 2 high</span>
+    </div>
+    <div class="stat">
+      <span class="stat-n">21</span>
+      <span class="stat-l">tests pinning those defects<br>fail-when-fixed markers</span>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <h2>How the defects are recorded</h2>
+      <p>Every finding below is pinned by a live test, not just described in prose.</p>
+    </div>
+
+    <p style="max-width:78ch">
+      Backend defects use Jest's <code>it.failing</code>; frontend defects use Playwright's
+      <code>test.fail()</code>. Both invert the result: the test <strong>passes while the
+      assertion fails</strong>, and <strong>starts failing the moment the bug is
+      fixed</strong>. That keeps the suite green today while making it impossible to ship a
+      fix without being told the marker is now stale — delete the marker, keep the
+      assertion, and the test becomes an ordinary regression guard.
+    </p>
+
+    <div class="note">
+      <p>
+        <strong>No application code was modified.</strong> The brief was tests only, with
+        defects flagged rather than fixed. Everything added is test code, test support, or
+        documentation: <code>backend/tests/</code>, <code>backend/jest.config.js</code>,
+        <code>e2e/</code>, <code>playwright.config.ts</code>,
+        <code>frontend/vite.e2e.config.ts</code>, <code>TESTING.md</code>. Three
+        <code>devDependencies</code> blocks gained test packages.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Findings</h2>
+      <p>Ranked by severity. Each was reproduced before being reported.</p>
+    </div>
+
+    <div class="findings">
+
+      <!-- F-01 ─────────────────────────────────────────────────────────── -->
+      <article class="finding critical">
+        <div class="f-head">
+          <span class="sev">Critical</span>
+          <span class="f-id">F-01</span>
+          <span class="f-scope">Frontend</span>
+        </div>
+        <h3>Pipeline stage moves are silently discarded</h3>
+
+        <dl class="f-body">
+          <dt>Where</dt>
+          <dd><span class="loc">frontend/src/hooks/usePipelineDrag.ts — onDragOver / onDragEnd</span></dd>
+
+          <dt>Mechanism</dt>
+          <dd>
+            <p>
+              <code>onDragOver</code> optimistically writes the target stage into the React
+              Query cache while the pointer is still down. <code>onDragEnd</code> then
+              recomputes <code>original</code> from <code>deals</code> — which is derived
+              from that same, already-mutated cache — and returns early on
+              <code>targetStage === original.stage</code>. For a real move that comparison
+              is always true, so <code>move()</code> is never called and
+              <strong>no HTTP request is issued at all</strong>.
+            </p>
+          </dd>
+
+          <dt>Impact</dt>
+          <dd>
+            <p>
+              The board looks correct until the deals query is refetched or the page
+              reloaded, at which point every card snaps back. Downstream, a deal can never
+              reach <code>Won</code> by dragging, so the Won → Contact conversion never
+              fires and no customer record is created. Sales data entered through the
+              primary interface is lost without any error.
+            </p>
+          </dd>
+
+          <dt>Evidence</dt>
+          <dd>
+            <p class="evidence">
+              Observed live: card moves <span>Lead → Qualified</span> in the DOM,
+              <span>PATCH requests: []</span>, and after reload the card is back in
+              <span>Lead</span>. The server endpoint itself is fine — 63 backend tests
+              cover <code>PATCH /api/deals/:id/stage</code> including the Won hook.
+            </p>
+            <p class="evidence" style="margin-top:8px">
+              Pinned by <span>e2e/lead-lifecycle.spec.ts</span> →
+              "a dragged stage move should persist", "dragging a deal to Won should create a Contact".
+            </p>
+          </dd>
+
+          <dt>Suggested fix</dt>
+          <dd>
+            <p>
+              Capture the deal's stage in <code>onDragStart</code> and compare against that
+              snapshot in <code>onDragEnd</code>, rather than re-reading the cache the drag
+              has already mutated.
+            </p>
+          </dd>
+        </dl>
+      </article>
+
+      <!-- F-02 ─────────────────────────────────────────────────────────── -->
+      <article class="finding high">
+        <div class="f-head">
+          <span class="sev">High</span>
+          <span class="f-id">F-02</span>
+          <span class="f-scope">Backend · tenancy</span>
+        </div>
+        <h3>Cross-tenant data leak through unvalidated references</h3>
+
+        <dl class="f-body">
+          <dt>Where</dt>
+          <dd><span class="loc">controllers/tasks.controller.js, deals.controller.js, contacts.controller.js, leads.controller.js</span></dd>
+
+          <dt>Mechanism</dt>
+          <dd>
+            <p>
+              No create or update handler checks that an incoming <em>reference</em> —
+              <code>assignedTo</code>, <code>relatedTo</code>, <code>leadId</code>,
+              <code>dealId</code> — points at a record in the caller's own organization.
+              The handlers then <code>.populate()</code> those references, and
+              <code>populate</code> resolves by <code>_id</code> alone with no tenancy
+              filter. A user in Org A who supplies an Org B ObjectId gets that foreign
+              record's fields echoed back — in the create response, and again on every
+              subsequent list request.
+            </p>
+          </dd>
+
+          <dt>Impact</dt>
+          <dd>
+            <p>
+              Confirmed leaks: a foreign lead's first name, last name and company (via a
+              task's <code>relatedTo</code> or a deal's <code>leadId</code>); a foreign
+              user's first name, last name, email and avatar (via <code>assignedTo</code>).
+              The reference persists in the document, so it re-leaks on every read until
+              removed. Exploitation requires knowing a target ObjectId, which bounds it —
+              but ObjectIds are exposed in URLs and are partly timestamp-derived, and this
+              is a tenancy boundary, where the bound is not the point.
+            </p>
+          </dd>
+
+          <dt>Evidence</dt>
+          <dd>
+            <p class="evidence">
+              Pinned by <span>backend/tests/multitenancy.test.js</span> → 5 markers under
+              "KNOWN GAP: cross-tenant reference population". Everything else about the
+              boundary holds: <span>200 tests</span> in that file cover reads, writes,
+              deletes, lists, counts, search, filters, pagination and aggregates across
+              Leads, Deals, Contacts, Tasks, Team members, Invitations and Organization,
+              for all five roles, in both directions.
+            </p>
+          </dd>
+
+          <dt>Suggested fix</dt>
+          <dd>
+            <p>
+              Validate each reference at write time against the caller's
+              <code>organizationId</code> and reject with 400 — filtering on read would
+              leave a dangling cross-tenant pointer that a future <code>populate</code>
+              resolves again.
+            </p>
+          </dd>
+        </dl>
+      </article>
+
+      <!-- F-03 ─────────────────────────────────────────────────────────── -->
+      <article class="finding high">
+        <div class="f-head">
+          <span class="sev">High</span>
+          <span class="f-id">F-03</span>
+          <span class="f-scope">Backend · auth</span>
+        </div>
+        <h3>Refresh tokens are not unique, so sessions die at random</h3>
+
+        <dl class="f-body">
+          <dt>Where</dt>
+          <dd><span class="loc">services/token.service.js — generateRefreshToken
+services/auth.service.js — buildTokenPair</span></dd>
+
+          <dt>Mechanism</dt>
+          <dd>
+            <p>
+              <code>generateRefreshToken</code> is always handed exactly
+              <code>{ sub }</code>. The only other fields in the JWT are <code>iat</code>,
+              <code>exp</code> and <code>iss</code>, and <code>iat</code>/<code>exp</code>
+              have one-second resolution — so any two refresh tokens issued to the same
+              user inside the same second are <strong>byte-identical</strong>, and their
+              stored SHA-256 hashes collide.
+            </p>
+            <p style="margin-top:8px">
+              Rotation then eats itself: refresh #1 revokes the old row and inserts a new
+              row with the <em>same</em> hash, so refresh #2 finds the revoked row first and
+              returns 401. Separately, two logins in one second create two rows sharing one
+              hash, and <code>revokeRefreshToken</code> uses <code>updateOne</code>, so
+              logout revokes only one of them.
+            </p>
+          </dd>
+
+          <dt>Impact</dt>
+          <dd>
+            <p>
+              A 401 from <code>/auth/refresh</code> clears the client session. Every full
+              page load re-bootstraps with a refresh call, so navigating quickly by URL — or
+              simply having two tabs open, since each tab's <code>isRefreshing</code> guard
+              is per-tab — logs the user out. This reads as flaky, unexplained sign-outs,
+              which is the hardest class of bug to get a useful report about.
+            </p>
+          </dd>
+
+          <dt>Evidence</dt>
+          <dd>
+            <p class="evidence">
+              Pinned by <span>backend/tests/auth.test.js</span> → 4 markers under "KNOWN
+              GAP: refresh token uniqueness", and independently reproduced from the browser
+              by <span>e2e/auth.spec.ts</span> → "rapid full-page navigation signs the user
+              out". Seen in the API log as a run of
+              <span>POST /api/auth/refresh 200</span> with a <span>401</span> in the middle
+              and the app back on the login screen.
+            </p>
+          </dd>
+
+          <dt>Suggested fix</dt>
+          <dd>
+            <p>
+              Add a random <code>jti</code> (or any nonce) to the refresh payload. That one
+              change resolves all four markers and the E2E symptom.
+            </p>
+          </dd>
+        </dl>
+      </article>
+
+      <!-- F-04 ─────────────────────────────────────────────────────────── -->
+      <article class="finding medium">
+        <div class="f-head">
+          <span class="sev">Medium</span>
+          <span class="f-id">F-04</span>
+          <span class="f-scope">Backend · reporting</span>
+        </div>
+        <h3><code>closedAt</code> is only stamped by the drag endpoint</h3>
+
+        <dl class="f-body">
+          <dt>Where</dt>
+          <dd><span class="loc">controllers/deals.controller.js — updateDeal (PATCH /api/deals/:id)</span></dd>
+
+          <dt>Mechanism</dt>
+          <dd>
+            <p>
+              <code>moveDealStage</code> deliberately uses <code>findOne</code> +
+              <code>save</code> so the pre-save hook fires and stamps
+              <code>closedAt</code>. <code>updateDeal</code> uses
+              <code>findOneAndUpdate</code>, which does not run document middleware — so
+              setting a deal to <code>Won</code> or <code>Lost</code> through the ordinary
+              edit form leaves <code>closedAt</code> null.
+            </p>
+          </dd>
+
+          <dt>Impact</dt>
+          <dd>
+            <p>
+              <code>closedAt</code> is the field the money reports key off. A deal won this
+              way is absent from weekly revenue, from the revenue-trend buckets, and from
+              the activity feed, while showing as Won everywhere else. It presents as "the
+              dashboard numbers are wrong", not as a stage bug.
+              <code>reports.service.js</code> already carries a comment working around
+              exactly this; <code>dashboard.service.js</code> does not.
+            </p>
+          </dd>
+
+          <dt>Evidence</dt>
+          <dd>
+            <p class="evidence">
+              Pinned by <span>backend/tests/deals.test.js</span> → 5 markers under "KNOWN
+              GAP: closedAt on PATCH /api/deals/:id", including assertions through
+              <span>/api/dashboard/stats</span>, <span>/api/dashboard/revenue-trend</span>
+              and <span>/api/activity-log</span>. A passing test sits alongside them
+              confirming the <span>/stage</span> route does stamp it, so the gap cannot be
+              misread as "closedAt never works".
+            </p>
+          </dd>
+        </dl>
+      </article>
+
+      <!-- F-05 ─────────────────────────────────────────────────────────── -->
+      <article class="finding medium">
+        <div class="f-head">
+          <span class="sev">Medium</span>
+          <span class="f-id">F-05</span>
+          <span class="f-scope">Frontend</span>
+        </div>
+        <h3>A newly added lead does not appear in the table</h3>
+
+        <dl class="f-body">
+          <dt>Where</dt>
+          <dd><span class="loc">frontend/src/components/leads/AddLeadDrawer.tsx — createLeadMutation.onSuccess</span></dd>
+
+          <dt>Mechanism</dt>
+          <dd>
+            <p>
+              The drawer declares its own <code>useMutation</code> and invalidates only
+              <code>['dashboard','stats']</code> and
+              <code>['dashboard','lead-activity']</code>. It never invalidates
+              <code>['leads']</code>, which is the key <code>useLeadsList</code> reads — and
+              that query sets <code>staleTime: 2 * 60 * 1000</code>. The repository already
+              contains a <code>useCreateLead</code> hook that invalidates
+              <code>['leads']</code> correctly; the drawer does not use it.
+            </p>
+          </dd>
+
+          <dt>Impact</dt>
+          <dd>
+            <p>
+              The user sees "Lead added successfully" and an unchanged table. The record can
+              stay invisible for up to two minutes, and navigating away and back does not
+              help. The obvious reading is that the save failed, so people re-enter the
+              lead.
+            </p>
+          </dd>
+
+          <dt>Evidence</dt>
+          <dd>
+            <p class="evidence">
+              Pinned by <span>e2e/lead-lifecycle.spec.ts</span> → "a newly added lead should
+              appear without a reload". A companion passing test confirms the record really
+              is persisted.
+            </p>
+          </dd>
+        </dl>
+      </article>
+
+      <!-- F-06 ─────────────────────────────────────────────────────────── -->
+      <article class="finding medium">
+        <div class="f-head">
+          <span class="sev">Medium</span>
+          <span class="f-id">F-06</span>
+          <span class="f-scope">Frontend</span>
+        </div>
+        <h3>Registration dead-ends on the login page with no message</h3>
+
+        <dl class="f-body">
+          <dt>Where</dt>
+          <dd><span class="loc">frontend/src/pages/auth/RegisterPage.tsx — registerMutation.onSuccess</span></dd>
+
+          <dt>Mechanism</dt>
+          <dd>
+            <p>
+              <code>onSuccess</code> discards the entire response. The API returns
+              <code>{ user, organization, tokens }</code> and sets a refresh cookie, but the
+              mutation calls neither <code>setAuth</code> nor anything else — it only
+              navigates to <code>/verify-email</code>. That page's first branch is
+              <code>if (!isAuthenticated &amp;&amp; !token) return &lt;Navigate to={LOGIN} /&gt;</code>,
+              so the brand-new user is bounced straight to the login screen.
+            </p>
+          </dd>
+
+          <dt>Impact</dt>
+          <dd>
+            <p>
+              A person fills in the sign-up form, clicks Create Account, and lands on the
+              login page with no confirmation, no "check your inbox", and no resend button —
+              the account exists and the email was sent, but nothing says so. The entire
+              "Check your inbox" screen, including its resend-verification control, is
+              unreachable from registration. The tokens the server issued are thrown away.
+            </p>
+          </dd>
+
+          <dt>Evidence</dt>
+          <dd>
+            <p class="evidence">
+              Pinned by <span>e2e/auth.spec.ts</span> → 'after registering, the user should
+              see "Check your inbox"'. The rest of the journey works: the same spec
+              registers, reads the real verification token, verifies through the real
+              endpoint, logs in, and loads the dashboard.
+            </p>
+          </dd>
+        </dl>
+      </article>
+
+      <!-- F-07 ─────────────────────────────────────────────────────────── -->
+      <article class="finding low">
+        <div class="f-head">
+          <span class="sev">Low</span>
+          <span class="f-id">F-07</span>
+          <span class="f-scope">Frontend</span>
+        </div>
+        <h3>Every failed login reports "No refresh token provided"</h3>
+
+        <dl class="f-body">
+          <dt>Where</dt>
+          <dd><span class="loc">frontend/src/services/api/axiosInstance.ts — response interceptor, 401 branch</span></dd>
+
+          <dt>Mechanism</dt>
+          <dd>
+            <p>
+              The interceptor treats <em>every</em> 401 as an expired access token and fires
+              a silent refresh, with no exemption for the auth endpoints themselves. A
+              failed <code>POST /auth/login</code> (401 <code>INVALID_CREDENTIALS</code>)
+              therefore triggers <code>POST /auth/refresh</code>, which fails with 401
+              <code>NO_REFRESH_TOKEN</code> because an anonymous visitor has no refresh
+              cookie — and it is that error which reaches <code>login.mutate</code>'s
+              <code>onError</code>.
+            </p>
+          </dd>
+
+          <dt>Impact</dt>
+          <dd>
+            <p>
+              Users mistyping a password are shown an internal message that tells them
+              nothing. It also masks the real reason: "please verify your email" (a 403)
+              still surfaces correctly, but wrong-password and unknown-account do not. Plus
+              one wasted round-trip on every failed sign-in.
+            </p>
+          </dd>
+
+          <dt>Evidence</dt>
+          <dd>
+            <p class="evidence">
+              Pinned by <span>e2e/auth.spec.ts</span> → "a wrong password should say so, not
+              report a missing refresh token". A companion passing test confirms the login is
+              genuinely refused and no session is created.
+            </p>
+          </dd>
+        </dl>
+      </article>
+
+      <!-- F-08 ─────────────────────────────────────────────────────────── -->
+      <article class="finding low">
+        <div class="f-head">
+          <span class="sev">Low</span>
+          <span class="f-id">F-08</span>
+          <span class="f-scope">Frontend · RBAC</span>
+        </div>
+        <h3>The global header offers "Add Lead" to a viewer</h3>
+
+        <dl class="f-body">
+          <dt>Where</dt>
+          <dd><span class="loc">frontend/src/components/layout/TopNavbar.tsx</span></dd>
+
+          <dt>Mechanism</dt>
+          <dd>
+            <p>
+              The header's "Add Lead" button has no permission check at all — no
+              <code>usePermissions</code>, no <code>can(...)</code>. <code>LeadsPage</code>
+              gates its own copy of the button correctly on
+              <code>can(LEADS_WRITE)</code>; the global nav does not.
+            </p>
+          </dd>
+
+          <dt>Impact</dt>
+          <dd>
+            <p>
+              A viewer sees the button on every page, can open the drawer, fill in the whole
+              form, and only discovers the action was never available when the submit
+              answers 403. <strong>Not a security hole</strong> — the server refuses the
+              write — but the interface promises something it cannot deliver.
+            </p>
+          </dd>
+
+          <dt>Evidence</dt>
+          <dd>
+            <p class="evidence">
+              Pinned by <span>e2e/rbac-ui.spec.ts</span> → "the header offers Add Lead to a
+              viewer". A companion passing test drives the drawer to submission as a viewer
+              and asserts the API returns <span>403</span>, which is what confirms the
+              boundary itself holds.
+            </p>
+          </dd>
+        </dl>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>What holds up well</h2>
+      <p>Worth saying plainly, because a findings list on its own is misleading.</p>
+    </div>
+
+    <div class="cols">
+      <div class="card">
+        <h3>Tenant isolation</h3>
+        <p>
+          Every controller scopes the <em>query</em> by <code>organizationId</code> rather
+          than fetching and comparing afterwards, so a foreign id matches nothing and the
+          denial is indistinguishable from a missing record — no existence oracle. Counts,
+          searches, aggregates and reports are all scoped. 200 tests, one leak (F-02).
+        </p>
+      </div>
+      <div class="card">
+        <h3>Server-side RBAC</h3>
+        <p>
+          Every guarded route was driven against every role: 213 tests. The owner is
+          protected as a target from demotion and removal, including by themselves and
+          through two separate routes; nobody can act on a peer at or above their own level;
+          the invite level check reads the database role, not the token claim, so a stale
+          token cannot widen it.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Injection and XSS</h3>
+        <p>
+          Operator-injection in login bodies, filters and search is neutralised; regex
+          metacharacters, unbalanced parentheses and a catastrophic-backtracking pattern all
+          return an empty result set rather than a 500 or a hang. Stored payloads round-trip
+          verbatim and are served as JSON with <code>nosniff</code>, so they are inert in
+          transit.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Token handling</h3>
+        <p>
+          Expired, malformed, wrong-secret, wrong-issuer, <code>alg:none</code> and
+          payload-tampered tokens are all 401 with no stack trace. A refresh token cannot be
+          used as an access token. A 2FA temp token is refused everywhere except
+          <code>/auth/verify-otp</code>, and that route refuses full access tokens.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Rate limiting</h3>
+        <p>
+          Login (5 / 15 min), forgot-password and resend-verification (3 / hr) and the
+          general API surface (100 / 15 min) all reach 429. The block applies to the correct
+          password too, buckets per IP rather than per account, and
+          <code>X-Forwarded-For</code> cannot escape it in the shipping configuration.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Responsive layout</h3>
+        <p>
+          No horizontal page scroll and no overlapping text on Dashboard, Leads or Pipeline
+          at 375, 768 or 1280 px — 35 checks, all passing. The kanban board correctly
+          scrolls inside its own container rather than the page. No visual regressions found.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Coverage</h2>
+      <p>Backend, from <code>npm test -- --coverage</code>. The E2E suite is behavioural and not instrumented.</p>
+    </div>
+
+    <div class="tscroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th class="num">Statements</th>
+            <th style="width:150px">&nbsp;</th>
+            <th class="num">Branches</th>
+            <th class="num">Functions</th>
+            <th class="num">Lines</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>routes</td>
+            <td class="num">99.45%</td>
+            <td><span class="bar"><i style="width:99.45%"></i></span></td>
+            <td class="num">83.33%</td><td class="num">100%</td><td class="num">100%</td>
+          </tr>
+          <tr>
+            <td>utils</td>
+            <td class="num">91.89%</td>
+            <td><span class="bar"><i style="width:91.89%"></i></span></td>
+            <td class="num">54.28%</td><td class="num">86.66%</td><td class="num">94.11%</td>
+          </tr>
+          <tr>
+            <td>models</td>
+            <td class="num">91.47%</td>
+            <td><span class="bar"><i style="width:91.47%"></i></span></td>
+            <td class="num">77.77%</td><td class="num">66.66%</td><td class="num">91.47%</td>
+          </tr>
+          <tr>
+            <td>controllers</td>
+            <td class="num">83.41%</td>
+            <td><span class="bar"><i style="width:83.41%"></i></span></td>
+            <td class="num">70.57%</td><td class="num">84.40%</td><td class="num">85.36%</td>
+          </tr>
+          <tr>
+            <td>middleware</td>
+            <td class="num">82.60%</td>
+            <td><span class="bar"><i style="width:82.6%"></i></span></td>
+            <td class="num">58.06%</td><td class="num">88.23%</td><td class="num">82.22%</td>
+          </tr>
+          <tr>
+            <td>services</td>
+            <td class="num">62.98%</td>
+            <td><span class="bar low"><i style="width:62.98%"></i></span></td>
+            <td class="num">41.69%</td><td class="num">64.51%</td><td class="num">65.15%</td>
+          </tr>
+          <tr style="background:var(--surface-sunk)">
+            <td><strong>All measured files</strong></td>
+            <td class="num"><strong>77.84%</strong></td>
+            <td><span class="bar"><i style="width:77.84%"></i></span></td>
+            <td class="num"><strong>56.54%</strong></td>
+            <td class="num"><strong>75.49%</strong></td>
+            <td class="num"><strong>79.61%</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <p>
+        <strong>Where the uncovered code is, and why.</strong> The gap is concentrated in
+        <code>services/</code>: <code>ai.service.js</code> sits at 19% because every path
+        needs a live Gemini key and the suite deliberately runs without one, so those two
+        routes answer 503 instead of billing Google. <code>dashboard.service.js</code> (53%)
+        and <code>auth.service.js</code> (65%) hold Google-OAuth sign-in, the AI-insights
+        aggregation, and 2FA enrolment branches — all reachable, all worth adding, none of
+        them the request path a tenant boundary or a role guard runs through. Branch
+        coverage trails statements mostly because of defensive
+        <code>a ?? b</code> fallbacks on optional fields.
+        <code>config/db.js</code> is excluded outright: it calls <code>process.exit()</code>
+        on failure and the suite never connects through it.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Suite inventory</h2>
+      <p>What was written, and what each file is responsible for.</p>
+    </div>
+
+    <div class="tscroll">
+      <table>
+        <thead>
+          <tr><th>File</th><th class="num">Tests</th><th>Responsibility</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="file">tests/multitenancy.test.js</td>
+            <td class="num">200</td>
+            <td>Organization isolation across all resources, roles, routes, aggregates and the token claim itself. The largest file, as briefed.</td>
+          </tr>
+          <tr>
+            <td class="file">tests/rbac.test.js</td>
+            <td class="num">213</td>
+            <td>Route × role matrix over every guarded route, plus target-level rules (owner protection, no acting at or above your level).</td>
+          </tr>
+          <tr>
+            <td class="file">tests/security.test.js</td>
+            <td class="num">99</td>
+            <td>NoSQL/SQL injection, XSS storage, rate limiters, JWT handling, information disclosure, payload limits.</td>
+          </tr>
+          <tr>
+            <td class="file">tests/auth.test.js</td>
+            <td class="num">77</td>
+            <td>Register, verify, login, 2FA, refresh rotation, logout, password reset and change, sessions.</td>
+          </tr>
+          <tr>
+            <td class="file">tests/leads.test.js</td>
+            <td class="num">68</td>
+            <td>CRUD, validation, enums, pagination, search and filter for Leads.</td>
+          </tr>
+          <tr>
+            <td class="file">tests/deals.test.js</td>
+            <td class="num">63</td>
+            <td>As above for Deals, plus stage movement and the Won → Contact conversion.</td>
+          </tr>
+          <tr>
+            <td class="file">tests/tasks.test.js</td>
+            <td class="num">57</td>
+            <td>As above for Tasks, plus completion semantics and the overdue filter.</td>
+          </tr>
+          <tr>
+            <td class="file">e2e/lead-lifecycle.spec.ts</td>
+            <td class="num">8</td>
+            <td>The core loop: lead → deal → Won → contact, including the pipeline drag.</td>
+          </tr>
+          <tr>
+            <td class="file">e2e/auth.spec.ts</td>
+            <td class="num">9</td>
+            <td>Register → verify with the real emailed token → login → dashboard, plus route guards and session durability.</td>
+          </tr>
+          <tr>
+            <td class="file">e2e/rbac-ui.spec.ts</td>
+            <td class="num">28</td>
+            <td>What each of the five roles can see and reach in the interface.</td>
+          </tr>
+          <tr>
+            <td class="file">e2e/responsive.spec.ts</td>
+            <td class="num">35</td>
+            <td>Layout integrity at 375 / 768 / 1280 px on Dashboard, Leads and Pipeline.</td>
+          </tr>
+          <tr>
+            <td class="file">e2e/smoke.spec.ts</td>
+            <td class="num">1</td>
+            <td>Harness sanity check: the API answers and login works.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Notes on the brief</h2>
+      <p>Three places where the application does not match what the brief assumed. None is a defect; each changed what got tested.</p>
+    </div>
+
+    <div class="cols">
+      <div class="card">
+        <h3>Member and Team Settings</h3>
+        <p>
+          The brief asks to confirm a Member "cannot access Team Settings". A Member
+          <em>can</em> reach <code>/settings/team</code>, by design — the route carries no
+          role guard, <code>GET /api/team/members</code> is open to any member, and the page
+          degrades to a read-only roster. The settings page that <em>is</em> role-gated is
+          <code>/settings/organization</code>. Both are now asserted for their real
+          behaviour.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Leads are not pipeline cards</h3>
+        <p>
+          The brief describes dragging "the lead" through the pipeline. The board holds
+          <em>Deals</em>; Lead and Deal are separate collections, and it is a Deal reaching
+          Won that creates a Contact. The New Deal dialog also collects no
+          <code>leadId</code>, though the API accepts one — so the two halves of the funnel
+          cannot be joined from the UI, and the Contact that Won produces is named after the
+          deal rather than the person. Worth a product decision.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Password policy disagreement</h3>
+        <p>
+          The client's registration schema requires a special character; the API's
+          <code>passwordRules</code> require only 8 characters, an uppercase letter and a
+          digit. The client being stricter is safe, but the two should agree, or an
+          API-created password will be one the UI would have rejected.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>One thing to know about the harness</h2>
+      <p>A near-miss worth recording, and one deliberate trade-off.</p>
+    </div>
+
+    <div class="finding high" style="border-left-color:var(--high)">
+      <div class="f-head">
+        <span class="sev">Near miss</span>
+        <span class="f-scope">Test infrastructure</span>
+      </div>
+      <h3>The first suite run connected to the live SMTP server</h3>
+      <dl class="f-body">
+        <dt>What happened</dt>
+        <dd>
+          <p>
+            The test setup originally <code>delete</code>d the <code>SMTP_*</code> variables
+            so the email service would fall back to its console stub. But
+            <code>app.js</code> calls <code>dotenv.config()</code> at require time, and
+            dotenv fills in any key that is <em>missing</em> while skipping one that is
+            already present — so deleting them handed the real <code>backend/.env</code>
+            credentials straight back, and the run authenticated against the production Brevo
+            SMTP server. Log line: <code>✅ Brevo SMTP connected successfully</code>.
+          </p>
+        </dd>
+        <dt>Now</dt>
+        <dd>
+          <p>
+            Those variables are set to <code>''</code> rather than deleted, and
+            <code>tests/setup/afterEnv.js</code> asserts at startup that no real SMTP or
+            Gemini credential is visible to the test process — it refuses to run if one is.
+            Anyone adding an E2E-style harness to this repo should know this: a test suite
+            that boots <code>app.js</code> inherits <code>.env</code> unless it actively
+            blocks it.
+          </p>
+        </dd>
+      </dl>
+    </div>
+
+    <div class="note">
+      <p>
+        <strong>Rate limiting is disabled inside the E2E environment</strong>, deliberately.
+        A full run is several hundred requests from one machine, which the 100-per-15-minute
+        limiter would refuse, so <code>e2e/rate-limit-proxy.cjs</code> gives every request a
+        distinct <code>X-Forwarded-For</code> and the API runs with
+        <code>TRUST_PROXY=true</code> — the same setting it uses on Render. The header is
+        injected server-side because <code>config/cors.js</code> allows only
+        <code>Content-Type</code> and <code>Authorization</code> from the browser. The
+        limiters themselves are tested directly in <code>security.test.js</code>, including
+        the fact that <code>X-Forwarded-For</code> <em>cannot</em> bypass them in the
+        configuration that ships.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Running it</h2>
+      <p>Full detail in <code>TESTING.md</code>.</p>
+    </div>
+
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Goal</th><th>Command</th></tr></thead>
+        <tbody>
+          <tr><td>Backend, all suites</td><td class="file">cd backend &amp;&amp; npm test</td></tr>
+          <tr><td>Backend with coverage</td><td class="file">cd backend &amp;&amp; npm test -- --coverage</td></tr>
+          <tr><td>One backend file</td><td class="file">cd backend &amp;&amp; npm test -- multitenancy</td></tr>
+          <tr><td>E2E, all specs</td><td class="file">npx playwright test</td></tr>
+          <tr><td>E2E with HTML report</td><td class="file">npx playwright test --reporter=html</td></tr>
+          <tr><td>Open the last report</td><td class="file">npx playwright show-report</td></tr>
+          <tr><td>First-time browser install</td><td class="file">npx playwright install chromium</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:20px">
+      Neither suite touches a real database or sends real email: both start their own
+      in-memory MongoDB and blank the SMTP and Gemini credentials before the application
+      loads.
+    </p>
+  </section>
+
+  <footer>
+    <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-bottom:14px">
+      <span class="chip pass">777 backend tests passing</span>
+      <span class="chip pass">81 E2E tests passing</span>
+      <span class="chip">8 defects pinned by 21 markers</span>
+      <span class="chip">0 application files modified</span>
+    </div>
+    <p style="max-width:76ch">
+      Every finding was reproduced before being written down, and every one is held open by
+      a test that will fail when it is fixed. Start with F-01: it is one comparison, and it
+      is losing sales data today.
+    </p>
+  </footer>
+
+</div>

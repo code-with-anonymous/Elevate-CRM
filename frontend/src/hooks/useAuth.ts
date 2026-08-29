@@ -13,7 +13,6 @@ export interface UseAuthReturn {
   role: UserRole;
   permissions: string[];
   pendingTwoFactor: boolean;
-  otpDestination: string | null;
   sessionExpiry: number | null;
   hasPermission: (permission: string) => boolean;
   hasRole: (role: UserRole) => boolean;
@@ -31,7 +30,6 @@ export function useAuth(): UseAuthReturn {
   const role = useAuthStore((s) => s.role);
   const permissions = useAuthStore((s) => s.permissions);
   const pendingTwoFactor = useAuthStore((s) => s.pendingTwoFactor);
-  const otpDestination = useAuthStore((s) => s.otpDestination);
   const sessionExpiry = useAuthStore((s) => s.sessionExpiry);
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const hasRole = useAuthStore((s) => s.hasRole);
@@ -44,7 +42,6 @@ export function useAuth(): UseAuthReturn {
     role,
     permissions,
     pendingTwoFactor,
-    otpDestination,
     sessionExpiry,
     hasPermission,
     hasRole,

@@ -72,6 +72,8 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
+import { markActivity } from '@/hooks/useAuthActions';
+import { isCompletedAuth } from '@/types/auth';
 import authService from '@/services/api/authService';
 import { ROUTES } from '@/constants';
 
@@ -82,14 +84,19 @@ export function SocialLoginButtons() {
   const googleMutation = useMutation({
     mutationFn: (accessToken: string) => authService.googleLogin(accessToken),
     onSuccess: (data) => {
-      // This now matches the updated backend response exactly ✅
+      if (!isCompletedAuth(data)) {
+        toast.error('Unexpected response from the server. Please try again.');
+        return;
+      }
+
       setAuth(
-        data.user, 
-        data.tokens.accessToken, 
-        data.organization, 
+        data.user,
+        data.tokens.accessToken,
+        data.organization,
         data.tokens.expiresIn
       );
-      
+
+      markActivity();
       toast.success('Successfully logged in with Google');
       navigate(ROUTES.DASHBOARD, { replace: true });
     },

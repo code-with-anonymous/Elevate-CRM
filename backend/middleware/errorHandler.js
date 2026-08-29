@@ -86,9 +86,25 @@ function errorHandler(err, req, res, next) {
   const statusCode = err.statusCode || 500;
   const message    = env.IS_PROD ? 'Internal server error' : (err.message || 'Internal server error');
 
-  if (!env.IS_PROD) {
-    console.error('❌ Unhandled error:', err);
-  }
+  // Always log the stack — production MOST of all.
+  //
+  // This was `if (!env.IS_PROD)`, which logged everywhere EXCEPT the one
+  // environment where you cannot attach a debugger. The cost was concrete: a
+  // `TypeError: totp.generateSecret is not a function` broke 2FA enrolment
+  // completely, and every Render log line for it was blank. The client sees an
+  // opaque "Internal server error"; the server has to see the real thing, or
+  // nobody can act on the report.
+  //
+  // Method and path included so a log line is actionable on its own.
+  //
+  // NOTE: config/cors.js advertises `exposedHeaders: ['X-Request-ID']`, but
+  // nothing in the app ever sets that header — there is no request-id
+  // middleware. Correlating a user's report to a specific log line would need
+  // one; worth adding, out of scope here.
+  console.error(
+    `❌ Unhandled error — ${req.method} ${req.originalUrl}:`,
+    err
+  );
 
   return res.status(statusCode).json({
     success:  false,

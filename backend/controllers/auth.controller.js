@@ -169,9 +169,9 @@ const verify2FA = asyncHandler(async (req, res) => {
 
 // ── POST /auth/2fa/disable  [protected] ──────────────────────────────────────
 const disable2FA = asyncHandler(async (req, res) => {
-  const { code } = req.body;
+  const { code, password } = req.body;
   const userId = req.user.sub;
-  await authService.disable2FA(userId, code);
+  await authService.disable2FA(userId, code, password);
   return ApiResponse.ok(res, '2FA disabled.');
 });
 
@@ -277,7 +277,9 @@ const getLoginHistory = asyncHandler(async (req, res) => {
 // ── GET /auth/sessions  [protected] ──────────────────────────────────────────
 const getSessions = asyncHandler(async (req, res) => {
   const userId = req.user.sub;
-  const data   = await authService.getSessions(userId);
+  // req is passed so the service can mark which row is this caller's own
+  // session, by hashing their refresh cookie.
+  const data   = await authService.getSessions(userId, req);
   return ApiResponse.ok(res, 'Active sessions', data);
 });
 

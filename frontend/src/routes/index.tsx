@@ -23,7 +23,6 @@ const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('@pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('@pages/auth/ResetPasswordPage'));
 const VerifyEmailPage = lazy(() => import('@pages/auth/VerifyEmailPage'));
-const OtpPage = lazy(() => import('@pages/auth/OtpPage'));
 const TwoFactorPage = lazy(() => import('@pages/auth/TwoFactorPage'));
 const AcceptInvitePage = lazy(() => import('@pages/auth/AcceptInvitePage'));
 // ChangePasswordPage is now ORPHANED. It used to be mounted at
@@ -133,16 +132,12 @@ export const router = createBrowserRouter([
       </Lazy>
     ),
   },
-  {
-    path: ROUTES.VERIFY_OTP,
-    element: (
-      <Lazy>
-        <ProtectedRoute allowPartialAuth>
-          <OtpPage />
-        </ProtectedRoute>
-      </Lazy>
-    ),
-  },
+  // ROUTES.VERIFY_OTP and its OtpPage are gone. It duplicated /2fa — same code
+  // entry, same endpoint — but discarded the tokens the response carried and
+  // never called setAuth, so it navigated to /dashboard still unauthenticated
+  // and ProtectedRoute bounced it straight back to /2fa: a redirect loop.
+  // One 2FA screen now. (/auth/verify-otp, the API endpoint, is very much alive
+  // — it is what /2fa submits to.)
   {
     path: ROUTES.TWO_FACTOR,
     element: (

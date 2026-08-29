@@ -65,7 +65,9 @@ const authService = {
   /**
    * Authenticate user with email + password
    * POST /auth/login
-   * Returns AuthResponse; if requires2FA is true → redirect to /2fa
+   * Returns AuthResponse. When `requiresTwoFactor` is true the response carries
+   * only that flag and a `tempToken` — no user, org or tokens — and the caller
+   * must redirect to /2fa. Narrow with isCompletedAuth() before using it.
    */
   login: async (data: LoginPayload): Promise<AuthResponse> => {
     const response = await axiosInstance.post<Envelope<AuthResponse>>(
@@ -248,22 +250,37 @@ const authService = {
    * Verify TOTP code to complete 2FA setup or login
    * POST /auth/2fa/verify
    */
-  verify2FA: async (code: string): Promise<AuthResponse> => {
-    const response = await axiosInstance.post<Envelope<AuthResponse>>(
+  /**
+   * Complete 2FA SETUP — proves the user can read a code from the app they just
+   * enrolled, and flips is2FAEnabled on.
+   *
+   * Returns a message only, no tokens. This was declared `Promise<AuthResponse>`,
+   * which is simply untrue: the endpoint sends `{ success, message }` with no
+   * `data`. That lie is what let TwoFactorPage compile
+   * `data.tokens.accessToken` against `undefined` and crash at runtime.
+   *
+   * To complete a 2FA *login*, use verifyOtp — a different endpoint.
+   */
+  verify2FA: async (code: string): Promise<MessageResponse> => {
+    const response = await axiosInstance.post<MessageResponse>(
       API_ENDPOINTS.AUTH.VERIFY_2FA,
       { code }
     );
-    return response.data.data;
+    return response.data;
   },
 
   /**
    * Disable 2FA — requires verification code
    * POST /auth/2fa/disable
    */
-  disable2FA: async (code: string): Promise<MessageResponse> => {
+  /**
+   * Turn 2FA off. Requires the account password as well as a current code —
+   * removing a protection is the direction that deserves the extra proof.
+   */
+  disable2FA: async (code: string, password: string): Promise<MessageResponse> => {
     const response = await axiosInstance.post<MessageResponse>(
       API_ENDPOINTS.AUTH.DISABLE_2FA,
-      { code }
+      { code, password }
     );
     return response.data;
   },

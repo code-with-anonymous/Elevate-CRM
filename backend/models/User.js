@@ -77,6 +77,27 @@ const userSchema = new mongoose.Schema(
       default: null,
       select: false,
     },
+    /**
+     * Single-use recovery codes, issued at 2FA enrolment.
+     *
+     * Only bcrypt hashes are stored — the plaintext is shown to the user once,
+     * at enrolment, and never again. `usedAt` is what enforces single use: a
+     * code is spent, not deleted, so the row remains as evidence it was used.
+     *
+     * `select: false` alongside twoFASecret — these ARE the 2FA bypass, so they
+     * must never ride along on an ordinary user read.
+     */
+    twoFABackupCodes: {
+      type: [
+        {
+          _id:    false,
+          hash:   { type: String, required: true },
+          usedAt: { type: Date, default: null },
+        },
+      ],
+      default: [],
+      select: false,
+    },
     passwordResetToken: {
       type: String,
       default: null,
@@ -154,6 +175,9 @@ userSchema.set('toJSON', {
     delete ret.passwordResetToken;
     delete ret.passwordResetExpiry;
     delete ret.twoFASecret;
+    // Belt and braces alongside `select: false` — a serialized user must never
+    // carry the recovery-code hashes, however it was loaded.
+    delete ret.twoFABackupCodes;
     return ret;
   },
 });
