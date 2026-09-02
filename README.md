@@ -1,4 +1,4 @@
-# TTP CRM
+# Elevate CRM
 
 A multi-tenant SaaS CRM built with the MERN stack — manage leads, pipelines, contacts, tasks, and teams across isolated organizations, with role-based access control and a full authentication and security layer.
 
